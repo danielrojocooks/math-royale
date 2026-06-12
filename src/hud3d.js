@@ -3,7 +3,7 @@
 // Reads battle state S each frame; player actions go through battle exports.
 import { DECK, PANEL_Y } from '../data/units.js';
 import * as battle from './battle.js';
-import { worldToScreen } from './render3d.js';
+import { worldToScreen, getPortraits } from './render3d.js';
 
 let root, elixCells, elixNum, cardEls = [], banner, bannerText;
 const popEls = new Map();
@@ -112,6 +112,15 @@ export function initHud() {
   });
   root.appendChild(cards);
   document.body.appendChild(root);
+
+  // Swap in portraits photographed from the real 3D models (weapons included)
+  // once they're loaded; the 2D art is just the placeholder until then.
+  getPortraits().then(p => {
+    cardEls.forEach((el, i) => {
+      const url = p[DECK[i].spr];
+      if (url) el.querySelector('img').src = url;
+    });
+  });
 
   banner = document.createElement('div'); banner.id = 'hud-banner';
   bannerText = document.createElement('div'); bannerText.className = 'big';

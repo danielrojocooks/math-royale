@@ -39,6 +39,7 @@ const WEAPONS = ['sword_A', 'sword_B', 'shield_A', 'shield_B', 'bow_A_withString
 
 let scene, cam, ren, raycaster, groundPlane, clock;
 let assets = { chars: {}, clips: {} }, ready = false;
+let readyResolve; const readyPromise = new Promise(r => { readyResolve = r; });
 let towersBuilt = false, towerVis = new Map(), troopVis = new Map();
 let partVis = new Map(), matCache = {};
 
@@ -143,6 +144,51 @@ async function loadAssets() {
   });
   decorate();
   ready = true;
+  readyResolve();
+}
+
+// ---- character assembly (battlefield + portraits share this) ----
+function buildCharacter(def) {
+  const obj = SkeletonUtils.clone(assets.chars[def.glb]);
+  obj.traverse(n => { if (n.isMesh) n.castShadow = true; });
+  for (const [slot, key] of [['handslot.r', def.r], ['handslot.l', def.l]]) {
+    if (!key || !assets.weapons?.[key]) continue;
+    let socket = null;
+    obj.traverse(n => { if (n.name === slot) socket = n; });
+    if (socket) {
+      const w = SkeletonUtils.clone(assets.weapons[key]);
+      w.traverse(n => { if (n.isMesh) n.castShadow = true; });
+      socket.add(w);
+    }
+  }
+  return obj;
+}
+
+// ---- card portraits: photograph the real 3D characters once at load ----
+let portraitCache = null;
+export async function getPortraits() {
+  if (portraitCache) return portraitCache;
+  await readyPromise;
+  const r = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  r.setSize(160, 160);
+  const sc = new THREE.Scene();
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x668844, 1.5));
+  const dl = new THREE.DirectionalLight(0xffffff, 2.4); dl.position.set(2, 3, 4); sc.add(dl);
+  const pc = new THREE.PerspectiveCamera(38, 1, .1, 20);
+  pc.position.set(0, 1.5, 3.3); pc.lookAt(0, 1.0, 0);
+  portraitCache = {};
+  for (const [spr, def] of Object.entries(MODEL3D)) {
+    const obj = buildCharacter(def);
+    obj.rotation.y = 0.5;                                // 3/4 face view
+    const mx = new THREE.AnimationMixer(obj);            // pose out of T-pose
+    if (assets.clips['Idle_A']) { mx.clipAction(assets.clips['Idle_A']).play(); mx.update(0.4); }
+    sc.add(obj);
+    r.render(sc, pc);
+    portraitCache[spr] = r.domElement.toDataURL('image/png');
+    sc.remove(obj);
+  }
+  r.dispose();
+  return portraitCache;
 }
 
 function place(model, x, z, s, ry) {
@@ -269,19 +315,7 @@ function syncTroops(S, dt) {
     let v = troopVis.get(t);
     if (!v && !t.dead) {
       const def = MODEL3D[t.spr] || MODEL3D.unit_20;
-      const obj = SkeletonUtils.clone(assets.chars[def.glb]);
-      obj.traverse(n => { if (n.isMesh) n.castShadow = true; });
-      // weapons into the rig's handslot sockets
-      for (const [slot, key] of [['handslot.r', def.r], ['handslot.l', def.l]]) {
-        if (!key || !assets.weapons?.[key]) continue;
-        let socket = null;
-        obj.traverse(n => { if (n.name === slot) socket = n; });
-        if (socket) {
-          const w = SkeletonUtils.clone(assets.weapons[key]);
-          w.traverse(n => { if (n.isMesh) n.castShadow = true; });
-          socket.add(w);
-        }
-      }
+      const obj = buildCharacter(def);
       const scale = 0.42 + t.maxval * 0.062;            // size = magnitude
       obj.scale.setScalar(scale);
       scene.add(obj);
