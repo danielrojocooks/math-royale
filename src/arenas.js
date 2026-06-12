@@ -17,6 +17,7 @@
 import { ARENAS, getArena } from '../data/arenas.js';
 import { arenaFluentPct } from './mastery.js';
 import { saveProfile } from './store.js';
+import { getPortraits } from './render3d.js';
 
 // ─── progress helpers ─────────────────────────────────────────────────────────
 
@@ -300,6 +301,8 @@ function showUnlockCelebration(unlocks, onDone) {
     img.src = 'assets/fantasy_t/clean/' + u.spr + '.png';
     img.alt = u.name;
     ov.appendChild(img);
+    // upgrade to the live 3D portrait if available
+    getPortraits().then(p => { if (p[u.spr]) img.src = p[u.spr]; }).catch(() => {});
 
     const tap = document.createElement('div');
     tap.className = 'unlock-tap';

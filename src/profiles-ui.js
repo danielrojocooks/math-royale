@@ -1,6 +1,17 @@
 // Profile picker overlay — plain HTML/CSS injected over the canvas.
 // Call showProfilePicker(onSelect) to display it; it calls onSelect() when done.
 import { listProfiles, createProfile, deleteProfile, setActiveProfileId } from './store.js';
+import { getPortraits } from './render3d.js';
+
+// Swap any <img data-spr> under root to the live 3D portraits once they exist.
+function upgradeImgs(root) {
+  getPortraits().then(p => {
+    root.querySelectorAll('img[data-spr]').forEach(im => {
+      const u = p[im.dataset.spr];
+      if (u) im.src = u;
+    });
+  }).catch(() => {});
+}
 
 // The 4 hero sprites that can be chosen as avatars
 const HEROES = [
@@ -179,6 +190,7 @@ export function showProfilePicker(onSelect) {
 
       const img = document.createElement('img');
       img.src = sprUrl(p.avatar);
+      img.dataset.spr = p.avatar;
       img.alt = p.name;
       card.appendChild(img);
 
@@ -213,6 +225,7 @@ export function showProfilePicker(onSelect) {
     newCard.innerHTML = '<span>+</span><div class="pui-name" style="font-size:16px;color:#c026a8">New Hero</div>';
     newCard.addEventListener('click', renderNewForm);
     grid.appendChild(newCard);
+    upgradeImgs(overlay);
   }
 
   function renderNewForm() {
@@ -236,6 +249,7 @@ export function showProfilePicker(onSelect) {
 
       const img = document.createElement('img');
       img.src = sprUrl(h.spr);
+      img.dataset.spr = h.spr;
       img.alt = h.label;
       btn.appendChild(img);
 
@@ -289,5 +303,6 @@ export function showProfilePicker(onSelect) {
 
     overlay.appendChild(form);
     nameInput.focus();
+    upgradeImgs(overlay);
   }
 }

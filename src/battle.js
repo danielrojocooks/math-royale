@@ -1,6 +1,6 @@
 // Battle simulation: all game state and rules. NO rendering, NO DOM, NO canvas.
 // render2d.js reads S to draw; input.js calls the exported actions.
-import { LANE, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK as DEFAULT_DECK, FOES, WORDS } from '../data/units.js';
+import { LANE, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK as DEFAULT_DECK, FOES } from '../data/units.js';
 
 // ---- active deck (set by setDeck; defaults to data/units.js DECK) ----
 let _activeDeck = DEFAULT_DECK;
@@ -86,14 +86,16 @@ function chunks(x, y, cols, n) {
 function splat(x, y, c) { S.decals.push({ x, y, r: 24 + Math.random() * 20, life: 1.7, maxlife: 1.7, color: c, rot: Math.random() * 6.28 }); }
 function popup(x, y, t, c, big) { S.pops.push({ x, y, text: t, color: c, life: 1, vy: -46, big: !!big }); }
 
+// Deaths are pure explosion — no comic text (playtest feedback); the only
+// floating text in battle is numbers (damage, remaining values).
 function deathFx(t) {
   const side = t.side === 'you' ? '#2b7de0' : '#e23b3b';
   ring(t.x, t.y, '#fff'); chunks(t.x, t.y, ['#8b1a1a', '#c0392b', side, '#ffcf4d', '#fff'], 18); splat(t.x, t.y + 12, '#7a1414');
-  S.shake = Math.max(S.shake, .28); popup(t.x, t.y - 16, WORDS[Math.floor(Math.random() * WORDS.length)], '#ffe14d', true);
+  S.shake = Math.max(S.shake, .28);
 }
 function towerFx(tw) {
   ring(tw.x, tw.y, '#fff'); chunks(tw.x, tw.y, ['#9aa3ad', '#6b7480', '#4a525c', '#ffcf4d'], 26);
-  splat(tw.x, tw.y + 18, '#5a5246'); S.shake = Math.max(S.shake, .5); popup(tw.x, tw.y - 30, 'KABLOOIE!', '#fff', true);
+  splat(tw.x, tw.y + 18, '#5a5246'); S.shake = Math.max(S.shake, .5);
 }
 
 // ---- troops ----
