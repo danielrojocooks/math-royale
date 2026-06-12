@@ -81,9 +81,9 @@ function towerFx(tw) {
 }
 
 // ---- troops ----
-function mkTroop(side, lane, y, val, spr) {
+function mkTroop(side, lane, y, val, spr, xoff) {
   S.troops.push({
-    side, lane, x: LANE[lane], y, val, maxval: val, spr,
+    side, lane, x: LANE[lane] + (xoff || 0), y, val, maxval: val, spr,
     pop: 0, flash: 0, hit: 0, atk: 0, atkcd: .3, struck: false,
     walk: Math.random() * 6.28, dust: 0, moving: false, dead: false, dying: 0,
   });
@@ -102,16 +102,25 @@ function oppTower(side, lane) {
 
 // ---- player actions (called by input.js) ----
 export function trySelectCard(i) {
-  if (DECK[i].val <= S.elixir) { S.sel = i; return true; }
+  if ((DECK[i].cost ?? DECK[i].val) <= S.elixir) { S.sel = i; return true; }
   S.shake = .12; return false;
 }
 export function tryDeploy(x, y) {
   // Anywhere on YOUR half counts (CR rule); the drop point clamps into the deploy band.
   if (S.sel < 0 || y < RIVER_B + 10) return false;
   const d = DECK[S.sel];
-  if (d.val > S.elixir) return false;
-  S.elixir -= d.val;
-  mkTroop('you', x < 380 ? 0 : 1, Math.max(DEPLOY_MIN, Math.min(DEPLOY_MAX, y)), d.val, d.spr);
+  const cost = d.cost ?? d.val;
+  if (cost > S.elixir) return false;
+  S.elixir -= cost;
+  const lane = x < 380 ? 0 : 1;
+  const dy = Math.max(DEPLOY_MIN, Math.min(DEPLOY_MAX, y));
+  const n = d.count ?? 1;
+  // squads fan out in a small formation (offsets are visual; lane combat unchanged)
+  for (let i = 0; i < n; i++) {
+    const xoff = (i - (n - 1) / 2) * 30;
+    const yoff = (i % 2) * 34;
+    mkTroop('you', lane, Math.min(DEPLOY_MAX, dy + yoff), d.val, d.spr, xoff);
+  }
   S.sel = -1; return true;
 }
 

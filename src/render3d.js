@@ -40,6 +40,33 @@ const WEAPONS = ['sword_A', 'sword_B', 'shield_A', 'shield_B', 'bow_A_withString
 let scene, cam, ren, raycaster, groundPlane, clock;
 let assets = { chars: {}, clips: {} }, ready = false;
 let readyResolve; const readyPromise = new Promise(r => { readyResolve = r; });
+
+// ---- arena themes: sky/light/ground/flora per arena (applyTheme from main.js) ----
+const DEFAULT_THEME = {
+  sky: 0x8fd0ff, fog: 0x8fd0ff, ground: 0x6db33a, lane: 0x86c457, river: 0x3aa5e0,
+  hemi: 1.15, sun: 2.0, sunColor: 0xffffff, flora: 'green',
+};
+let theme = { ...DEFAULT_THEME };
+let themeGroup = null, groundMat, laneMats = [], riverMat, hemiLight, sunLight;
+
+export function applyTheme(t) {
+  theme = { ...DEFAULT_THEME, ...(t || {}) };
+  if (ready) rebuildTheme();
+}
+function rebuildTheme() {
+  scene.background.set(theme.sky);
+  scene.fog.color.set(theme.fog);
+  groundMat.color.set(theme.ground);
+  for (const m of laneMats) m.color.set(theme.lane);
+  riverMat.color.set(theme.river);
+  hemiLight.intensity = theme.hemi;
+  sunLight.intensity = theme.sun;
+  sunLight.color.set(theme.sunColor);
+  if (themeGroup) scene.remove(themeGroup);
+  themeGroup = new THREE.Group();
+  scene.add(themeGroup);
+  decorate();
+}
 let towersBuilt = false, towerVis = new Map(), troopVis = new Map();
 let partVis = new Map(), matCache = {};
 
@@ -58,13 +85,14 @@ export function initRender(canvas) {
   groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   clock = new THREE.Clock();
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x668844, 1.15));
-  const sun = new THREE.DirectionalLight(0xffffff, 2.0);
-  sun.position.set(9, 16, 7); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
-  sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
-  scene.add(sun);
+  hemiLight = new THREE.HemisphereLight(0xffffff, 0x668844, 1.15);
+  scene.add(hemiLight);
+  sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+  sunLight.position.set(9, 16, 7); sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.camera.left = -16; sunLight.shadow.camera.right = 16;
+  sunLight.shadow.camera.top = 16; sunLight.shadow.camera.bottom = -16;
+  scene.add(sunLight);
 
   buildField();
   resize(); addEventListener('resize', resize);
@@ -90,20 +118,21 @@ function resize() {
 
 // ---- static field ----
 function buildField() {
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80),
-    new THREE.MeshLambertMaterial({ color: 0x6db33a }));
+  groundMat = new THREE.MeshLambertMaterial({ color: 0x6db33a });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), groundMat);
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 
   // lanes (lighter strips)
   for (const lx of LANE) {
-    const lane = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 16),
-      new THREE.MeshLambertMaterial({ color: 0x86c457 }));
+    const m = new THREE.MeshLambertMaterial({ color: 0x86c457 });
+    laneMats.push(m);
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 16), m);
     lane.rotation.x = -Math.PI / 2; lane.position.set(bx(lx), 0.01, bz(560));
     lane.receiveShadow = true; scene.add(lane);
   }
   // river spans the whole visible width
-  const river = new THREE.Mesh(new THREE.PlaneGeometry(30, (RIVER_B - RIVER_T) / UZ + 0.4),
-    new THREE.MeshLambertMaterial({ color: 0x3aa5e0 }));
+  riverMat = new THREE.MeshLambertMaterial({ color: 0x3aa5e0 });
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(30, (RIVER_B - RIVER_T) / UZ + 0.4), riverMat);
   river.rotation.x = -Math.PI / 2; river.position.set(0, 0.02, bz((RIVER_T + RIVER_B) / 2));
   scene.add(river);
 }
@@ -116,7 +145,7 @@ async function loadAssets() {
   const names = [...new Set(Object.values(MODEL3D).map(m => m.glb))];
   const FOREST = ['Tree_1_A_Color1', 'Tree_2_A_Color1', 'Tree_3_A_Color1', 'Tree_4_A_Color1',
     'Bush_1_A_Color1', 'Bush_2_A_Color1', 'Rock_1_A_Color1', 'Rock_3_A_Color1',
-    'Grass_1_A_Color1', 'Grass_2_A_Color1'];
+    'Grass_1_A_Color1', 'Grass_2_A_Color1', 'Tree_Bare_1_A_Color1', 'Tree_Bare_2_A_Color1'];
   const PROPS_GLTF = ['barrel', 'crate_A_big', 'flag_blue', 'flag_red', 'fence_wood_straight', 'bucket_water'];
   const PROPS_GLB = ['chest_common', 'barrelDark', 'banner', 'bench'];
   const [libs, chars, env, forest, propsA, propsB] = await Promise.all([
@@ -142,7 +171,7 @@ async function loadAssets() {
     const r = [...propsA, ...propsB][i];
     if (r.status === 'fulfilled') assets.props[k] = r.value.scene;   // props are optional decor
   });
-  decorate();
+  rebuildTheme();           // applies whatever theme the arena requested pre-load
   ready = true;
   readyResolve();
 }
@@ -201,7 +230,7 @@ function place(model, x, z, s, ry) {
     if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; n.material = n.material.clone(); }
   });
   o.scale.setScalar(s); o.position.set(x, 0, z); o.rotation.y = ry || 0;
-  scene.add(o); return o;
+  (themeGroup || scene).add(o); return o;
 }
 
 function decorate() {
@@ -212,20 +241,30 @@ function decorate() {
   // builder-pack landmarks in the side meadows
   place(e.forest, -7.6, 3.5, 1.3); place(e.hill, 7.9, -6.5, 1.3);
   place(e.rocks, -7.2, -7.5, 1.2); place(e.forest, 8.1, 2.5, 1.2);
-  // dense forest-pack scatter: side meadows + back bands, out to the screen edges
+  // theme-aware scatter: which models populate the world depends on the arena
+  // F indexes: 0-3 trees, 4-5 bushes, 6-7 rocks, 8-9 grass, 10-11 bare trees
   const F = assets.forest;
-  for (let i = 0; i < 78; i++) {
+  const FLORA = {
+    green: { models: [0, 1, 2, 3, 4, 5, 6, 7], n: 78, grass: true },
+    dense: { models: [0, 1, 2, 3, 4, 5], n: 112, grass: true },     // deep forest
+    rocky: { models: [6, 7, 6, 7, 4], n: 92, grass: false },        // mines/canyon
+    frost: { models: [10, 11, 6, 7], n: 72, grass: false },         // bare + rocks
+    night: { models: [0, 1, 2, 3, 10, 11], n: 80, grass: false },   // woods + dead trees
+  };
+  const fl = FLORA[theme.flora] || FLORA.green;
+  for (let i = 0; i < fl.n; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     let x, z;
-    if (i < 52) { x = side * (6.4 + rng(i, 1) * 7.5); z = -12 + (i / 52) * 2 * 24 + rng(i, 2) * 1.6; }
+    const bandCut = Math.floor(fl.n * 0.66);
+    if (i < bandCut) { x = side * (6.4 + rng(i, 1) * 7.5); z = -12 + (i / bandCut) * 24 + rng(i, 2) * 1.6; }
     else { x = -13 + rng(i, 3) * 26; z = (i % 2 ? -12.5 : 11.6) + rng(i, 4) * 1.6; }
-    const model = F[Math.floor(rng(i, 5) * F.length)];
+    const model = F[fl.models[Math.floor(rng(i, 5) * fl.models.length)]];
     // forest-pack models are authored much larger than builder-pack buildings
     const s = 0.34 + rng(i, 6) * 0.22;
     place(model, x, z, s, rng(i, 7) * 6.28);
   }
-  // grass tufts inside the field (subtle, non-blocking)
-  for (let i = 0; i < 20; i++) {
+  // grass tufts inside the field (green arenas only)
+  if (fl.grass) for (let i = 0; i < 20; i++) {
     const g = F[8 + (i % 2)];
     place(g, -7 + rng(i, 8) * 14, -8 + rng(i, 9) * 15, 0.3 + rng(i, 10) * 0.18, rng(i, 11) * 6.28);
   }
@@ -261,17 +300,33 @@ function syncTowers(S) {
   let stale = towerVis.size !== S.towers.length;
   if (!stale) for (const t of S.towers) if (!towerVis.has(t)) { stale = true; break; }
   if (stale) {
-    for (const [, v] of towerVis) scene.remove(v.obj);
+    for (const [, v] of towerVis) { scene.remove(v.obj); if (v.hpBadge) scene.remove(v.hpBadge); }
     towerVis.clear();
     for (const t of S.towers) {
       const model = t.kind === 'king' ? assets.env.castle : assets.env.watchtower;
       const s = t.kind === 'king' ? 1.5 : 1.15;
       const obj = place(model, bx(t.x), bz(t.y), s, t.side === 'foe' ? Math.PI : 0);
-      towerVis.set(t, { obj, dead: false });
+      // HP number floating above the tower
+      const hpBadge = makeBadge(Math.max(0, Math.ceil(t.hp)), t.side === 'you' ? '#22c24a' : '#e23b3b');
+      hpBadge.scale.setScalar(1.0);
+      hpBadge.position.set(bx(t.x), t.kind === 'king' ? 3.6 : 2.9, bz(t.y));
+      scene.add(hpBadge);
+      towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false });
     }
   }
   for (const [t, v] of towerVis) {
+    // keep the HP number current
+    const hpNow = Math.max(0, Math.ceil(t.hp));
+    if (!t.dead && v.hpShown !== hpNow) {
+      scene.remove(v.hpBadge);
+      v.hpBadge = makeBadge(hpNow, t.side === 'you' ? '#22c24a' : '#e23b3b');
+      v.hpBadge.scale.setScalar(1.0);
+      v.hpBadge.position.set(bx(t.x), t.kind === 'king' ? 3.6 : 2.9, bz(t.y));
+      scene.add(v.hpBadge);
+      v.hpShown = hpNow;
+    }
     if (t.dead && !v.dead) {
+      scene.remove(v.hpBadge);
       v.dead = true;
       v.obj.traverse(n => { if (n.isMesh) { n.material = n.material.clone(); n.material.color.multiplyScalar(0.35); } });
       v.obj.scale.multiplyScalar(0.8); v.obj.rotation.z = 0.12;
@@ -289,10 +344,10 @@ function syncTowers(S) {
 function makeBadge(text, color) {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const x = c.getContext('2d');
-  x.beginPath(); x.arc(64, 64, 52, 0, 6.28); x.fillStyle = color; x.fill();
-  x.lineWidth = 10; x.strokeStyle = '#fff'; x.stroke();
-  x.fillStyle = '#fff'; x.font = '900 60px Trebuchet MS';
-  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 64, 68);
+  x.beginPath(); x.arc(64, 64, 56, 0, 6.28); x.fillStyle = color; x.fill();
+  x.lineWidth = 11; x.strokeStyle = '#fff'; x.stroke();
+  x.fillStyle = '#fff'; x.font = '900 72px Trebuchet MS';
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 64, 69);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
   sp.renderOrder = 99; return sp;
 }
@@ -323,8 +378,8 @@ function syncTroops(S, dt) {
       scene.add(obj);
       const mixer = new THREE.AnimationMixer(obj);
       const badge = makeBadge(t.val, t.side === 'you' ? '#2b7de0' : '#e23b3b');
-      badge.scale.setScalar(0.62);
-      badge.position.y = 2.35; obj.add(badge);
+      badge.scale.setScalar(0.92);
+      badge.position.y = 2.45; obj.add(badge);
       v = { obj, mixer, badge, badgeVal: t.val, action: null, anim: null, atkDef: def };
       troopVis.set(t, v);
       setAnim(v, 'Spawn_Ground', false);
@@ -344,7 +399,7 @@ function syncTroops(S, dt) {
     if (v.badgeVal !== t.val) {                          // number changed after combat
       v.obj.remove(v.badge);
       v.badge = makeBadge(t.val, t.side === 'you' ? '#2b7de0' : '#e23b3b');
-      v.badge.scale.setScalar(0.62); v.badge.position.y = 2.35; v.obj.add(v.badge);
+      v.badge.scale.setScalar(0.92); v.badge.position.y = 2.45; v.obj.add(v.badge);
       v.badgeVal = t.val;
       // size tracks the CURRENT number, not the spawn number — a 7 that fought
       // down to a 3 shrinks to 3-size (size = magnitude, kept honest)

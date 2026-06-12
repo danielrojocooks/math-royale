@@ -141,7 +141,7 @@ export function render(S) {
   ctx.fillStyle = '#fff'; ctx.font = '900 22px Trebuchet MS'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(Math.floor(S.elixir), 34, ey + eh / 2 + 1);
   for (let i = 0; i < DECK.length; i++) {
-    const r = cardRect(i), d = DECK[i], aff = d.val <= S.elixir, sel = S.sel === i;
+    const r = cardRect(i), d = DECK[i], aff = (d.cost ?? d.val) <= S.elixir, sel = S.sel === i;
     ctx.save(); if (sel) ctx.translate(0, -12); ctx.globalAlpha = aff ? 1 : .5;
     g = ctx.createLinearGradient(0, r.y, 0, r.y + r.h); g.addColorStop(0, '#fff4d6'); g.addColorStop(1, '#ffd98a');
     ctx.fillStyle = g; rr(r.x, r.y, r.w, r.h, 16); ctx.fill();
@@ -150,7 +150,7 @@ export function render(S) {
     ctx.translate(r.x + r.w / 2, r.y + r.h / 2 + 10); drawSpr(d.spr, r.h * 0.96); ctx.restore();
     ctx.beginPath(); ctx.arc(r.x + 2, r.y + 2, 18, 0, 6.28); ctx.fillStyle = '#c026a8'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.font = '900 20px Trebuchet MS'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.val, r.x + 2, r.y + 3);
+    ctx.fillStyle = '#fff'; ctx.font = '900 20px Trebuchet MS'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.cost ?? d.val, r.x + 2, r.y + 3);
     ctx.restore();
   }
 

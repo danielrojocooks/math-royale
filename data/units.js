@@ -11,12 +11,14 @@ export const DEPLOY_MIN = 580, DEPLOY_MAX = 890;  // where the player may drop t
 export const PANEL_Y = 970;              // top of the card/elixir panel
 export const SPEED = 52;                 // troop march speed (px/s)
 
-// Player deck. Rule (CURRICULUM.md #4): cost === power through Arena 7.
+// Player deck. Rule (CURRICULUM.md #4): cost === total power through Arena 7.
+// Cards are COMPOSITIONS of their number: count units of val each (count*val = cost).
+// 3 = 1+1+1, 4 = 2+2, 5 = 5, 7 = 7 — deploying is literally building the number.
 export const DECK = [
-  { name: 'Archer', spr: 'unit_03', val: 3 },
-  { name: 'Knight', spr: 'unit_02', val: 4 },
-  { name: 'Spear',  spr: 'unit_05', val: 5 },
-  { name: 'Wizard', spr: 'unit_01', val: 7 },
+  { name: 'Archers', spr: 'unit_03', cost: 3, count: 3, val: 1 },
+  { name: 'Knights', spr: 'unit_02', cost: 4, count: 2, val: 2 },
+  { name: 'Spearman', spr: 'unit_05', cost: 5, count: 1, val: 5 },
+  { name: 'Wizard', spr: 'unit_01', cost: 7, count: 1, val: 7 },
 ];
 
 // Enemy roster (scarier sprite = bigger number; size = magnitude)

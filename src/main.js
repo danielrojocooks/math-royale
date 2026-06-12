@@ -12,7 +12,7 @@
 // handler we call e.stopImmediatePropagation() so input.js never sees the tap,
 // then we navigate to arena select ourselves.
 
-import { initRender, render } from './render3d.js';
+import { initRender, render, applyTheme } from './render3d.js';
 import { initHud, updateHud } from './hud3d.js';
 import { initInput } from './input.js';
 import * as battle from './battle.js';
@@ -66,6 +66,9 @@ function openArenaSelect(profile) {
 function startMatch(profile, arenaId, isBoss) {
   const arena = getArena(arenaId);
   if (!arena) { openArenaSelect(profile); return; }
+
+  // 0. Arena look: sky, light, ground, flora.
+  applyTheme(arena.theme);
 
   // 1. Configure battle: restrict foe spawns + optional boss unit.
   battle.configureBattle({

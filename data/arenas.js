@@ -61,6 +61,8 @@ export const ARENAS = [
     // Weakest villain as boss (val 2); enemy spawns capped at 2 so matches stay easy
     boss: { name: 'Poisoner', spr: 'unit_20', val: 2 },
     foeMaxVal: 2,
+    // bright sunny meadow (the default look)
+    theme: { flora: 'green' },
   },
   {
     id: 2,
@@ -73,6 +75,8 @@ export const ARENAS = [
     ],
     boss: { name: 'Shadow Rogue', spr: 'unit_15', val: 3 },
     foeMaxVal: 3,
+    // watery: brighter sky, teal grass, vivid wide river
+    theme: { sky: 0x9fdcff, fog: 0x9fdcff, ground: 0x4faa72, lane: 0x6cc488, river: 0x1f8fe0, flora: 'green' },
   },
   {
     id: 3,
@@ -86,6 +90,8 @@ export const ARENAS = [
     ],
     boss: { name: 'Chain Brute', spr: 'unit_18', val: 4 },
     foeMaxVal: 4,
+    // deep dark forest: dense trees, dim golden light
+    theme: { sky: 0x6f9e7a, fog: 0x6f9e7a, ground: 0x3f7a2c, lane: 0x559440, river: 0x2f7fae, hemi: 0.8, sun: 1.5, sunColor: 0xffe9b0, flora: 'dense' },
   },
   {
     id: 4,
@@ -98,6 +104,8 @@ export const ARENAS = [
     ],
     boss: { name: 'Imp Lord', spr: 'unit_17', val: 5 },
     foeMaxVal: 5,
+    // rocky dusk mines: brown earth, rock fields, amber light
+    theme: { sky: 0xc99c72, fog: 0xc99c72, ground: 0x8d7a58, lane: 0xa3906a, river: 0x5f7884, hemi: 0.8, sun: 1.5, sunColor: 0xffb870, flora: 'rocky' },
   },
   {
     id: 5,
@@ -116,6 +124,8 @@ export const ARENAS = [
     ],
     boss: { name: 'Necromancer', spr: 'unit_16', val: 6 },
     foeMaxVal: 6,
+    // frost peak: white world, ice river, bare trees
+    theme: { sky: 0xddeeff, fog: 0xddeeff, ground: 0xe9f2f5, lane: 0xcfe2ea, river: 0x8fd0ff, hemi: 1.35, sun: 2.2, sunColor: 0xeaf4ff, flora: 'frost' },
   },
   {
     id: 6,
@@ -139,6 +149,8 @@ export const ARENAS = [
     // Strongest villain in current sprite set as final boss of this block
     boss: { name: 'Death Knight', spr: 'unit_14', val: 8 },
     foeMaxVal: 7,
+    // NIGHT: navy sky, moonlight, dark woods with dead trees
+    theme: { sky: 0x1c2752, fog: 0x1c2752, ground: 0x2c4a2e, lane: 0x3a613c, river: 0x25497a, hemi: 0.5, sun: 1.0, sunColor: 0xa9c2ff, flora: 'night' },
   },
 ];
 

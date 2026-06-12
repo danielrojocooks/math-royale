@@ -104,7 +104,7 @@ export function initHud() {
   cardEls = [];
   DECK.forEach((d, i) => {
     const el = document.createElement('div'); el.className = 'card';
-    el.innerHTML = `<span class="cost">${d.val}</span><img src="assets/fantasy_t/clean/${d.spr}.png" alt="${d.name}">`;
+    el.innerHTML = `<span class="cost">${d.cost ?? d.val}</span><img src="assets/fantasy_t/clean/${d.spr}.png" alt="${d.name}">`;
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
       if (battle.S.over) return;
@@ -138,7 +138,7 @@ export function updateHud(S) {
   elixNum.textContent = e;
   elixCells.forEach((c, i) => c.classList.toggle('on', i < e));
   cardEls.forEach((el, i) => {
-    el.classList.toggle('dim', DECK[i].val > S.elixir);
+    el.classList.toggle('dim', (DECK[i].cost ?? DECK[i].val) > S.elixir);
     el.classList.toggle('sel', S.sel === i);
   });
 
