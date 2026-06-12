@@ -47,14 +47,14 @@ function injectStyles() {
 #gate-card {
   position: fixed; z-index: 60;
   transform: translate(-50%, -100%);
-  background: linear-gradient(180deg, #fff4d6, #ffd98a);
-  border: 5px solid #ffcf4d;
-  border-radius: 20px;
-  padding: 10px 18px 12px;
-  min-width: 150px;
+  background: linear-gradient(180deg, rgba(255,244,214,.92), rgba(255,217,138,.92));
+  border: 3px solid #ffcf4d;
+  border-radius: 14px;
+  padding: 5px 10px 7px;
+  min-width: 108px; max-width: 150px;
   text-align: center;
   cursor: pointer;
-  box-shadow: 0 6px 24px rgba(0,0,0,.55);
+  box-shadow: 0 4px 14px rgba(0,0,0,.45);
   font-family: "Trebuchet MS","Segoe UI",sans-serif;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -64,17 +64,17 @@ function injectStyles() {
 @keyframes gate-drop-in { from { transform: translate(-50%,-140%) scale(.6); opacity: 0; }
                           to   { transform: translate(-50%,-100%) scale(1);  opacity: 1; } }
 #gate-card .eq {
-  font-size: clamp(26px, 6vw, 40px);
+  font-size: clamp(19px, 4vw, 27px);
   font-weight: 900; color: #5a3a10;
   letter-spacing: 1px; line-height: 1.1;
 }
 #gate-card .dots { min-height: 18px; padding: 4px 0 2px;
   display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
-#gate-card .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+#gate-card .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
 #gate-card .dot.a { background: #2b7de0; }
 #gate-card .dot.b { background: #c026a8; }
 #gate-card .count {
-  font-size: clamp(34px, 8vw, 54px);
+  font-size: clamp(24px, 5vw, 36px);
   font-weight: 900; color: #2b7de0;
   line-height: 1; min-height: 1em;
   text-shadow: 0 1px 0 #fff;
@@ -85,7 +85,7 @@ function injectStyles() {
   animation: gate-pip .15s cubic-bezier(.2,1.6,.6,1); }
 @keyframes gate-pip { from { transform: scale(0); } to { transform: scale(1); } }
 #gate-card .hint { font-size: 13px; font-weight: 700; color: #a4671b; min-height: 1.1em; }
-#gate-card .reward { font-size: 14px; font-weight: 900; color: #a4671b; }
+#gate-card .reward { font-size: 11px; font-weight: 900; color: #a4671b; }
 #gate-card .ans {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;
 }
@@ -286,8 +286,14 @@ function resolve(correct) {
 function positionCard() {
   if (!cardEl || !cardState) return;
   const t = cardState.reward.tower;
-  const p = worldToScreen(t.x, t.y - 80);
-  cardEl.style.left = p.x + 'px';
+  const p = worldToScreen(t.x, t.y - 40);
+  // Float over the empty meadow BESIDE the tower, not on top of the lane:
+  // left-lane towers push the card left, right-lane right; the king splits left.
+  const side = t.x < 380 ? -1 : (t.x > 380 ? 1 : -1);
+  const margin = 90;
+  let x = p.x + side * 150;
+  x = Math.max(margin, Math.min(innerWidth - margin - 80, x));  // keep on screen (landscape HUD rail too)
+  cardEl.style.left = x + 'px';
   cardEl.style.top = p.y + 'px';
 }
 
