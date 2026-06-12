@@ -1,6 +1,6 @@
 // Battle simulation: all game state and rules. NO rendering, NO DOM, NO canvas.
 // render2d.js reads S to draw; input.js calls the exported actions.
-import { LANE, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK, FOES, WORDS } from '../data/units.js';
+import { LANE, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK, FOES, WORDS } from '../data/units.js';
 
 // ---- arena configuration (set by arenas.js via configureBattle before reset()) ----
 // foeMaxVal: upper bound on villain val the AI may spawn (default = uncapped).
@@ -105,7 +105,8 @@ export function trySelectCard(i) {
   S.shake = .12; return false;
 }
 export function tryDeploy(x, y) {
-  if (S.sel < 0 || y < DEPLOY_MIN || y > DEPLOY_MAX) return false;
+  // Anywhere on YOUR half counts (CR rule); the drop point clamps into the deploy band.
+  if (S.sel < 0 || y < RIVER_B + 10) return false;
   const d = DECK[S.sel];
   if (d.val > S.elixir) return false;
   S.elixir -= d.val;

@@ -71,9 +71,10 @@ function resize() {
   cam.aspect = innerWidth / innerHeight;
   // pull the camera back further on narrow screens so the full lane width fits
   const need = 7.4 / Math.tan((cam.fov / 2) * Math.PI / 180) / cam.aspect;
-  const dist = Math.max(13.5, need * 0.62);
-  cam.position.set(0, dist, dist * 0.86);
-  cam.lookAt(0, 0, -0.8);
+  const dist = Math.max(16, need * 0.72);          // zoomed out
+  // slightly oblique CR tilt, field shifted up so the HUD doesn't cover the castle
+  cam.position.set(0.9, dist * 0.9, dist * 0.98);
+  cam.lookAt(0, 0, -1.6);
   cam.updateProjectionMatrix();
 }
 
@@ -103,18 +104,23 @@ function loadGlb(loader, url) { return new Promise((res, rej) => loader.load(url
 async function loadAssets() {
   const loader = new GLTFLoader();
   const names = [...new Set(Object.values(MODEL3D).map(m => m.glb))];
-  const [libs, chars, env] = await Promise.all([
+  const FOREST = ['Tree_1_A_Color1', 'Tree_2_A_Color1', 'Tree_3_A_Color1', 'Tree_4_A_Color1',
+    'Bush_1_A_Color1', 'Bush_2_A_Color1', 'Rock_1_A_Color1', 'Rock_3_A_Color1',
+    'Grass_1_A_Color1', 'Grass_2_A_Color1'];
+  const [libs, chars, env, forest] = await Promise.all([
     Promise.all(['Rig_Medium_MovementBasic', 'Rig_Medium_General', 'Rig_Medium_CombatMelee']
       .map(n => loadGlb(loader, 'assets/game/anim/' + n + '.glb'))),
     Promise.all(names.map(n => loadGlb(loader, 'assets/game/chars/' + n + '.glb'))),
     Promise.all(['castle', 'watchtower', 'bridge', 'detail_treeA', 'detail_treeB', 'detail_forestA', 'detail_rocks', 'detail_hill']
       .map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf.glb'))),
+    Promise.all(FOREST.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf'))),
   ]);
   for (const lib of libs) for (const c of lib.animations) assets.clips[c.name] = c;
   names.forEach((n, i) => { assets.chars[n] = chars[i].scene; });
   assets.env = {};
   ['castle', 'watchtower', 'bridge', 'treeA', 'treeB', 'forest', 'rocks', 'hill']
     .forEach((k, i) => { assets.env[k] = env[i].scene; });
+  assets.forest = forest.map(g => g.scene);
   decorate();
   ready = true;
 }
@@ -130,10 +136,28 @@ function decorate() {
   const e = assets.env;
   // bridges over the river at each lane
   for (const lx of LANE) place(e.bridge, bx(lx), bz(530), 1.5, Math.PI / 2);
-  // scenery outside the lanes
-  place(e.treeA, -8.2, -4, 1.5); place(e.treeB, 8.4, -2.5, 1.5);
-  place(e.forest, -8.6, 3.5, 1.4); place(e.treeA, 8.2, 5, 1.5);
-  place(e.rocks, -8.0, -8, 1.3); place(e.hill, 8.8, -7, 1.4);
+  // builder-pack landmarks
+  place(e.forest, -8.6, 3.5, 1.4); place(e.hill, 8.8, -7, 1.4);
+  place(e.rocks, -8.0, -8, 1.3); place(e.forest, 9.2, 2.5, 1.3);
+  // forest-pack scatter: deterministic ring of trees/bushes/rocks/grass around the field
+  const F = assets.forest;
+  const rng = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5; return s - Math.floor(s); };
+  for (let i = 0; i < 46; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const t = i / 46;
+    // two side bands + a back band behind each castle
+    let x, z;
+    if (i < 32) { x = side * (7.6 + rng(i, 1) * 4.5); z = -10 + t * 2 * 20 + rng(i, 2) * 1.5; }
+    else { x = -9 + rng(i, 3) * 18; z = (i % 2 ? -11.5 : 10.8) + rng(i, 4) * 1.2; }
+    const model = F[Math.floor(rng(i, 5) * F.length)];
+    const s = 1.1 + rng(i, 6) * 1.3;
+    place(model, x, z, s, rng(i, 7) * 6.28);
+  }
+  // grass tufts inside the field edges (subtle, non-blocking)
+  for (let i = 0; i < 14; i++) {
+    const g = F[8 + (i % 2)];                      // the two grass models
+    place(g, -6 + rng(i, 8) * 12, -7 + rng(i, 9) * 13, 0.9 + rng(i, 10) * 0.6, rng(i, 11) * 6.28);
+  }
 }
 
 // ---- towers (built lazily once assets are ready; rebuilt when battle resets) ----
@@ -201,7 +225,7 @@ function syncTroops(S, dt) {
       const def = MODEL3D[t.spr] || MODEL3D.unit_20;
       const obj = SkeletonUtils.clone(assets.chars[def.glb]);
       obj.traverse(n => { if (n.isMesh) n.castShadow = true; });
-      const scale = 0.62 + t.maxval * 0.105;            // size = magnitude
+      const scale = 0.5 + t.maxval * 0.085;             // size = magnitude
       obj.scale.setScalar(scale);
       scene.add(obj);
       const mixer = new THREE.AnimationMixer(obj);
@@ -219,7 +243,8 @@ function syncTroops(S, dt) {
       scene.remove(v.obj); troopVis.delete(t); continue;
     }
     v.obj.position.set(bx(t.x), 0, bz(t.y));
-    v.obj.rotation.y = t.side === 'you' ? Math.PI : 0;   // you face away (north), foe faces camera
+    // Quarter-turn so the player's characters show their faces while marching north
+    v.obj.rotation.y = t.side === 'you' ? Math.PI * 0.72 : -0.2;
     if (v.badgeVal !== t.val) {                          // number changed after combat
       v.obj.remove(v.badge);
       v.badge = makeBadge(t.val, t.side === 'you' ? '#2b7de0' : '#e23b3b');

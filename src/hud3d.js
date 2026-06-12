@@ -14,34 +14,36 @@ function injectStyles() {
   s.id = 'hud3d-style';
   s.textContent = `
 #hud { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  background: linear-gradient(180deg, #2d1654, #241043);
-  border-top: 5px solid #ffcf4d;
-  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  background: rgba(36, 16, 67, .58);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  border-top: 3px solid rgba(255, 207, 77, .8);
+  padding: 5px 8px calc(env(safe-area-inset-bottom, 0px) + 5px);
   font-family: "Trebuchet MS","Segoe UI",sans-serif;
   -webkit-user-select: none; user-select: none; }
-#hud .elix-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-#hud .elix-num { width: 38px; height: 38px; border-radius: 50%; background: #c026a8;
-  border: 3px solid #fff; color: #fff; font-weight: 900; font-size: 20px;
+#hud .elix-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+#hud .elix-num { width: 28px; height: 28px; border-radius: 50%; background: #c026a8;
+  border: 2px solid #fff; color: #fff; font-weight: 900; font-size: 15px;
   display: flex; align-items: center; justify-content: center; flex: none; }
-#hud .elix-bar { flex: 1; display: flex; gap: 3px; }
-#hud .elix-cell { flex: 1; height: 18px; border-radius: 5px; background: #2a1a4d;
-  border: 2px solid #5b3fa0; }
+#hud .elix-label { color: #ffcf4d; font-size: 11px; font-weight: 900; letter-spacing: 1px; flex: none; }
+#hud .elix-bar { flex: 1; display: flex; gap: 2px; }
+#hud .elix-cell { flex: 1; height: 11px; border-radius: 4px; background: rgba(42,26,77,.7);
+  border: 1px solid #5b3fa0; }
 #hud .elix-cell.on { background: linear-gradient(180deg, #ff5fae, #c026a8); border-color: #ff9bd8; }
-#hud .cards { display: flex; gap: 8px; justify-content: center; }
-#hud .card { flex: 1; max-width: 120px; aspect-ratio: 5/4; position: relative;
-  background: linear-gradient(180deg, #fff4d6, #ffd98a);
-  border: 4px solid #ffcf4d; border-radius: 14px;
+#hud .cards { display: flex; gap: 6px; justify-content: center; }
+#hud .card { flex: 1; max-width: 86px; aspect-ratio: 1/1; position: relative;
+  background: linear-gradient(180deg, rgba(255,244,214,.94), rgba(255,217,138,.94));
+  border: 3px solid #ffcf4d; border-radius: 12px;
   display: flex; align-items: flex-end; justify-content: center;
   cursor: pointer; transition: transform .12s, opacity .12s, border-color .12s;
   -webkit-tap-highlight-color: transparent; touch-action: manipulation; overflow: visible; }
-#hud .card img { height: 92%; object-fit: contain; pointer-events: none;
-  filter: drop-shadow(0 3px 3px rgba(0,0,0,.3)); }
-#hud .card .cost { position: absolute; top: -8px; left: -8px; width: 30px; height: 30px;
-  border-radius: 50%; background: #c026a8; border: 3px solid #fff; color: #fff;
-  font-size: 16px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
-#hud .card.dim { opacity: .45; }
-#hud .card.sel { transform: translateY(-10px); border-color: #2b7de0;
-  box-shadow: 0 0 16px rgba(43,125,224,.7); }
+#hud .card img { height: 90%; object-fit: contain; pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+#hud .card .cost { position: absolute; top: -7px; left: -7px; width: 24px; height: 24px;
+  border-radius: 50%; background: #c026a8; border: 2px solid #fff; color: #fff;
+  font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+#hud .card.dim { opacity: .4; }
+#hud .card.sel { transform: translateY(-8px); border-color: #2b7de0;
+  box-shadow: 0 0 14px rgba(43,125,224,.7); }
 .hud-pop { position: fixed; z-index: 45; pointer-events: none;
   font-family: "Trebuchet MS","Segoe UI",sans-serif; font-weight: 900;
   text-shadow: 0 2px 4px rgba(0,0,0,.8); transform: translate(-50%, -50%); }
@@ -65,6 +67,8 @@ export function initHud() {
 
   const row = document.createElement('div'); row.className = 'elix-row';
   elixNum = document.createElement('div'); elixNum.className = 'elix-num'; row.appendChild(elixNum);
+  const lbl = document.createElement('div'); lbl.className = 'elix-label';
+  lbl.textContent = '⚡ POWER'; row.appendChild(lbl);
   const bar = document.createElement('div'); bar.className = 'elix-bar';
   elixCells = [];
   for (let i = 0; i < 10; i++) {

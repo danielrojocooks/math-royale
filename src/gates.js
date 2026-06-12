@@ -181,7 +181,7 @@ function openCard(reward) {
 
   cardEl = document.createElement('div');
   cardEl.id = 'gate-card';
-  const rewardLabel = reward.type === 'repair' ? '🔧 fix the tower!' : '⚡ win elixir!';
+  const rewardLabel = reward.type === 'repair' ? '🔧 fix the tower!' : '⚡ win power!';
   if (mode === 'count') {
     cardEl.innerHTML = `
       <div class="reward">${rewardLabel}</div>
