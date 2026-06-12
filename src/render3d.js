@@ -310,6 +310,9 @@ function syncTroops(S, dt) {
       v.badge = makeBadge(t.val, t.side === 'you' ? '#2b7de0' : '#e23b3b');
       v.badge.scale.setScalar(0.62); v.badge.position.y = 2.35; v.obj.add(v.badge);
       v.badgeVal = t.val;
+      // size tracks the CURRENT number, not the spawn number — a 7 that fought
+      // down to a 3 shrinks to 3-size (size = magnitude, kept honest)
+      v.obj.scale.setScalar(0.42 + t.val * 0.062);
     }
     // animation state machine (after spawn finishes)
     if (v.anim !== 'Spawn_Ground' || t.atk > 0) {

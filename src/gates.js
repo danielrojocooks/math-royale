@@ -47,8 +47,9 @@ function injectStyles() {
 #gate-card {
   position: fixed; z-index: 60;
   transform: translate(-50%, -100%);
-  background: linear-gradient(180deg, rgba(255,244,214,.92), rgba(255,217,138,.92));
-  border: 3px solid #ffcf4d;
+  background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  border: 3px solid rgba(255,207,77,.75);
   border-radius: 14px;
   padding: 5px 10px 7px;
   min-width: 108px; max-width: 150px;
