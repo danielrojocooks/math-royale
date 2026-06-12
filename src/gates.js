@@ -50,10 +50,10 @@ function injectStyles() {
   transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
-  border: 3px solid rgba(255,207,77,.75);
-  border-radius: 14px;
-  padding: 5px 10px 7px;
-  min-width: 108px; max-width: 150px;
+  border: 4px solid rgba(255,207,77,.85);
+  border-radius: 16px;
+  padding: 8px 16px 10px;
+  min-width: 150px; max-width: 200px;
   text-align: center;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0,0,0,.45);
@@ -71,17 +71,17 @@ function injectStyles() {
 @keyframes gate-drop-in { from { transform: translateX(-50%) translateY(-40px) scale(.6); opacity: 0; }
                           to   { transform: translateX(-50%) translateY(0) scale(1);  opacity: 1; } }
 #gate-card .eq {
-  font-size: clamp(19px, 4vw, 27px);
+  font-size: clamp(26px, 5vw, 36px);
   font-weight: 900; color: #5a3a10;
   letter-spacing: 1px; line-height: 1.1;
 }
 #gate-card .dots { min-height: 18px; padding: 4px 0 2px;
   display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
-#gate-card .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+#gate-card .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
 #gate-card .dot.a { background: #2b7de0; }
 #gate-card .dot.b { background: #c026a8; }
 #gate-card .count {
-  font-size: clamp(24px, 5vw, 36px);
+  font-size: clamp(30px, 6vw, 46px);
   font-weight: 900; color: #2b7de0;
   line-height: 1; min-height: 1em;
   text-shadow: 0 1px 0 #fff;
