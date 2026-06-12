@@ -20,20 +20,22 @@ const UX = 42, UZ = 48;                         // battle px per world unit
 const bx = x => (x - 380) / UX;                 // battle -> world X
 const bz = y => (y - 540) / UZ;                 // battle -> world Z
 
-// unit sprite id -> 3D model + attack clip
+// unit sprite id -> 3D model + attack clip + weapons for the handslot sockets
 const MODEL3D = {
-  unit_02: { glb: 'Knight',    atk: 'Melee_1H_Attack_Chop' },   // Knight (4)
-  unit_03: { glb: 'Ranger',    atk: 'Melee_1H_Attack_Stab' },   // Archer (3)
-  unit_05: { glb: 'Barbarian', atk: 'Melee_2H_Attack_Chop' },   // Spear (5)
-  unit_01: { glb: 'Mage',      atk: 'Melee_2H_Attack_Spin' },   // Wizard (7)
-  unit_20: { glb: 'Skeleton_Minion',  atk: 'Melee_Unarmed_Attack_Punch_A' }, // 2
-  unit_15: { glb: 'Skeleton_Rogue',   atk: 'Melee_Dualwield_Attack_Stab' },  // 3
-  unit_18: { glb: 'Skeleton_Warrior', atk: 'Melee_1H_Attack_Chop' },         // 4
-  unit_17: { glb: 'Skeleton_Mage',    atk: 'Melee_2H_Attack_Spin' },         // 5
-  unit_16: { glb: 'Skeleton_Rogue',   atk: 'Melee_Dualwield_Attack_Slice' }, // 6
-  unit_13: { glb: 'Skeleton_Mage',    atk: 'Melee_2H_Attack_Spin' },         // 7
-  unit_14: { glb: 'Skeleton_Warrior', atk: 'Melee_2H_Attack_Chop' },         // 8
+  unit_02: { glb: 'Knight',    atk: 'Melee_1H_Attack_Chop', r: 'sword_A', l: 'shield_A' }, // Knight (4)
+  unit_03: { glb: 'Ranger',    atk: 'Melee_1H_Attack_Stab', l: 'bow_A_withString' },       // Archer (3)
+  unit_05: { glb: 'Barbarian', atk: 'Melee_2H_Attack_Chop', r: 'axe_A' },                  // Spear (5)
+  unit_01: { glb: 'Mage',      atk: 'Melee_2H_Attack_Spin', r: 'staff_A' },                // Wizard (7)
+  unit_20: { glb: 'Skeleton_Minion',  atk: 'Melee_Unarmed_Attack_Punch_A', r: 'dagger_B' },              // 2
+  unit_15: { glb: 'Skeleton_Rogue',   atk: 'Melee_Dualwield_Attack_Stab', r: 'dagger_A', l: 'dagger_B' },// 3
+  unit_18: { glb: 'Skeleton_Warrior', atk: 'Melee_1H_Attack_Chop', r: 'sword_B', l: 'shield_B' },        // 4
+  unit_17: { glb: 'Skeleton_Mage',    atk: 'Melee_2H_Attack_Spin', r: 'staff_B' },                       // 5
+  unit_16: { glb: 'Skeleton_Rogue',   atk: 'Melee_Dualwield_Attack_Slice', r: 'dagger_A', l: 'dagger_A' },// 6
+  unit_13: { glb: 'Skeleton_Mage',    atk: 'Melee_2H_Attack_Spin', r: 'staff_A' },                       // 7
+  unit_14: { glb: 'Skeleton_Warrior', atk: 'Melee_2H_Attack_Chop', r: 'sword_B', l: 'shield_B' },        // 8
 };
+const WEAPONS = ['sword_A', 'sword_B', 'shield_A', 'shield_B', 'bow_A_withString',
+  'axe_A', 'staff_A', 'staff_B', 'dagger_A', 'dagger_B'];
 
 let scene, cam, ren, raycaster, groundPlane, clock;
 let assets = { chars: {}, clips: {} }, ready = false;
@@ -125,6 +127,8 @@ async function loadAssets() {
     Promise.all(FOREST.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf'))),
     Promise.allSettled(PROPS_GLTF.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf'))),
     Promise.allSettled(PROPS_GLB.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf.glb'))),
+    Promise.allSettled(WEAPONS.map(n => loadGlb(loader, 'assets/game/weapons/' + n + '.gltf')))
+      .then(rs => { assets.weapons = {}; rs.forEach((r, i) => { if (r.status === 'fulfilled') assets.weapons[WEAPONS[i]] = r.value.scene; }); }),
   ]);
   for (const lib of libs) for (const c of lib.animations) assets.clips[c.name] = c;
   names.forEach((n, i) => { assets.chars[n] = chars[i].scene; });
@@ -267,7 +271,18 @@ function syncTroops(S, dt) {
       const def = MODEL3D[t.spr] || MODEL3D.unit_20;
       const obj = SkeletonUtils.clone(assets.chars[def.glb]);
       obj.traverse(n => { if (n.isMesh) n.castShadow = true; });
-      const scale = 0.5 + t.maxval * 0.085;             // size = magnitude
+      // weapons into the rig's handslot sockets
+      for (const [slot, key] of [['handslot.r', def.r], ['handslot.l', def.l]]) {
+        if (!key || !assets.weapons?.[key]) continue;
+        let socket = null;
+        obj.traverse(n => { if (n.name === slot) socket = n; });
+        if (socket) {
+          const w = SkeletonUtils.clone(assets.weapons[key]);
+          w.traverse(n => { if (n.isMesh) n.castShadow = true; });
+          socket.add(w);
+        }
+      }
+      const scale = 0.42 + t.maxval * 0.062;            // size = magnitude
       obj.scale.setScalar(scale);
       scene.add(obj);
       const mixer = new THREE.AnimationMixer(obj);
@@ -285,8 +300,11 @@ function syncTroops(S, dt) {
       scene.remove(v.obj); troopVis.delete(t); continue;
     }
     v.obj.position.set(bx(t.x), 0, bz(t.y));
-    // Quarter-turn so the player's characters show their faces while marching north
-    v.obj.rotation.y = t.side === 'you' ? Math.PI * 0.72 : -0.2;
+    // Honest facing while moving/attacking (no angled moonwalk); 3/4 turn toward
+    // the camera when standing still so faces get their moments.
+    const busy = t.moving || t.atk > 0;
+    v.obj.rotation.y = t.side === 'you' ? (busy ? Math.PI : Math.PI * 0.45)
+                                        : (busy ? 0 : -0.4);
     if (v.badgeVal !== t.val) {                          // number changed after combat
       v.obj.remove(v.badge);
       v.badge = makeBadge(t.val, t.side === 'you' ? '#2b7de0' : '#e23b3b');

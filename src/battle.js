@@ -149,6 +149,9 @@ export function update(dt) {
     } else S.foeTimer = .6;
   }
 
+  // tower hit-flash decay (was never decremented — towers stayed red forever)
+  for (const tw of S.towers) if (tw.flash > 0) tw.flash -= dt;
+
   // march + tower attacks (wind-up -> strike at 50% through the swing)
   for (const t of S.troops) {
     if (t.flash > 0) t.flash -= dt;
