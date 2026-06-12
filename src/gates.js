@@ -46,7 +46,7 @@ function injectStyles() {
   s.textContent = `
 #gate-card {
   position: fixed; z-index: 60;
-  left: 50%; top: 12px;              /* top center — prominent, can't be missed */
+  left: 50%; top: 26%;               /* center, below the enemy castle, above the river */
   transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
