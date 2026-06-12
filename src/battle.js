@@ -31,9 +31,10 @@ function tower(side, kind, x, y, lane, hp) {
 }
 
 export function reset() {
+  // Castles spread further apart -> longer marches, more board to play
   S.towers = [
-    tower('foe', 'prin', LANE[0], 235, 0, 14), tower('foe', 'prin', LANE[1], 235, 1, 14), tower('foe', 'king', 380, 95, -1, 24),
-    tower('you', 'prin', LANE[0], 720, 0, 14), tower('you', 'prin', LANE[1], 720, 1, 14), tower('you', 'king', 380, 880, -1, 24),
+    tower('foe', 'prin', LANE[0], 205, 0, 14), tower('foe', 'prin', LANE[1], 205, 1, 14), tower('foe', 'king', 380, 65, -1, 24),
+    tower('you', 'prin', LANE[0], 750, 0, 14), tower('you', 'prin', LANE[1], 750, 1, 14), tower('you', 'king', 380, 915, -1, 24),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;

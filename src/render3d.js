@@ -14,9 +14,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { LANE, RIVER_T, RIVER_B, PANEL_Y } from '../data/units.js';
 
-const U = 55;                                   // battle px per world unit
-const bx = x => (x - 380) / U;                  // battle -> world X
-const bz = y => (y - 540) / U;                  // battle -> world Z
+// Anisotropic mapping: X is stretched more than Z so the lanes spread apart and
+// the world uses the screen's width instead of cramming into a center strip.
+const UX = 42, UZ = 48;                         // battle px per world unit
+const bx = x => (x - 380) / UX;                 // battle -> world X
+const bz = y => (y - 540) / UZ;                 // battle -> world Z
 
 // unit sprite id -> 3D model + attack clip
 const MODEL3D = {
@@ -69,9 +71,13 @@ export function initRender(canvas) {
 function resize() {
   ren.setSize(innerWidth, innerHeight);
   cam.aspect = innerWidth / innerHeight;
-  // pull the camera back further on narrow screens so the full lane width fits
-  const need = 7.4 / Math.tan((cam.fov / 2) * Math.PI / 180) / cam.aspect;
-  const dist = Math.max(16, need * 0.72);          // zoomed out
+  // Fit by WHICHEVER axis binds: width on portrait (tablet), depth on landscape
+  // (desktop). No fat minimum distance — a landscape window gets a close camera
+  // instead of a tiny field floating in blank green margins.
+  const vF = Math.tan((cam.fov / 2) * Math.PI / 180);
+  const fitW = 9.5 / (vF * cam.aspect) * 0.66;     // field half-width ~9.0 + margin
+  const fitD = 10.0 / vF * 0.66;                   // field half-depth ~9.3 (tilt-foreshortened)
+  const dist = Math.max(9.0, fitW, fitD);
   // slightly oblique CR tilt, field shifted up so the HUD doesn't cover the castle
   cam.position.set(0.9, dist * 0.9, dist * 0.98);
   cam.lookAt(0, 0, -1.6);
@@ -86,13 +92,13 @@ function buildField() {
 
   // lanes (lighter strips)
   for (const lx of LANE) {
-    const lane = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 13.5),
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 16),
       new THREE.MeshLambertMaterial({ color: 0x86c457 }));
     lane.rotation.x = -Math.PI / 2; lane.position.set(bx(lx), 0.01, bz(560));
     lane.receiveShadow = true; scene.add(lane);
   }
-  // river
-  const river = new THREE.Mesh(new THREE.PlaneGeometry(13.2, (RIVER_B - RIVER_T) / U + 0.4),
+  // river spans the whole visible width
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(30, (RIVER_B - RIVER_T) / UZ + 0.4),
     new THREE.MeshLambertMaterial({ color: 0x3aa5e0 }));
   river.rotation.x = -Math.PI / 2; river.position.set(0, 0.02, bz((RIVER_T + RIVER_B) / 2));
   scene.add(river);
@@ -107,13 +113,17 @@ async function loadAssets() {
   const FOREST = ['Tree_1_A_Color1', 'Tree_2_A_Color1', 'Tree_3_A_Color1', 'Tree_4_A_Color1',
     'Bush_1_A_Color1', 'Bush_2_A_Color1', 'Rock_1_A_Color1', 'Rock_3_A_Color1',
     'Grass_1_A_Color1', 'Grass_2_A_Color1'];
-  const [libs, chars, env, forest] = await Promise.all([
+  const PROPS_GLTF = ['barrel', 'crate_A_big', 'flag_blue', 'flag_red', 'fence_wood_straight', 'bucket_water'];
+  const PROPS_GLB = ['chest_common', 'barrelDark', 'banner', 'bench'];
+  const [libs, chars, env, forest, propsA, propsB] = await Promise.all([
     Promise.all(['Rig_Medium_MovementBasic', 'Rig_Medium_General', 'Rig_Medium_CombatMelee']
       .map(n => loadGlb(loader, 'assets/game/anim/' + n + '.glb'))),
     Promise.all(names.map(n => loadGlb(loader, 'assets/game/chars/' + n + '.glb'))),
     Promise.all(['castle', 'watchtower', 'bridge', 'detail_treeA', 'detail_treeB', 'detail_forestA', 'detail_rocks', 'detail_hill']
       .map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf.glb'))),
     Promise.all(FOREST.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf'))),
+    Promise.allSettled(PROPS_GLTF.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf'))),
+    Promise.allSettled(PROPS_GLB.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf.glb'))),
   ]);
   for (const lib of libs) for (const c of lib.animations) assets.clips[c.name] = c;
   names.forEach((n, i) => { assets.chars[n] = chars[i].scene; });
@@ -121,6 +131,11 @@ async function loadAssets() {
   ['castle', 'watchtower', 'bridge', 'treeA', 'treeB', 'forest', 'rocks', 'hill']
     .forEach((k, i) => { assets.env[k] = env[i].scene; });
   assets.forest = forest.map(g => g.scene);
+  assets.props = {};
+  [...PROPS_GLTF, ...PROPS_GLB].forEach((k, i) => {
+    const r = [...propsA, ...propsB][i];
+    if (r.status === 'fulfilled') assets.props[k] = r.value.scene;   // props are optional decor
+  });
   decorate();
   ready = true;
 }
@@ -133,30 +148,45 @@ function place(model, x, z, s, ry) {
 }
 
 function decorate() {
-  const e = assets.env;
+  const e = assets.env, P = assets.props;
+  const rng = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5; return s - Math.floor(s); };
   // bridges over the river at each lane
   for (const lx of LANE) place(e.bridge, bx(lx), bz(530), 1.5, Math.PI / 2);
-  // builder-pack landmarks
-  place(e.forest, -8.6, 3.5, 1.4); place(e.hill, 8.8, -7, 1.4);
-  place(e.rocks, -8.0, -8, 1.3); place(e.forest, 9.2, 2.5, 1.3);
-  // forest-pack scatter: deterministic ring of trees/bushes/rocks/grass around the field
+  // builder-pack landmarks in the side meadows
+  place(e.forest, -7.6, 3.5, 1.3); place(e.hill, 7.9, -6.5, 1.3);
+  place(e.rocks, -7.2, -7.5, 1.2); place(e.forest, 8.1, 2.5, 1.2);
+  // dense forest-pack scatter: side meadows + back bands, out to the screen edges
   const F = assets.forest;
-  const rng = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5; return s - Math.floor(s); };
-  for (let i = 0; i < 46; i++) {
+  for (let i = 0; i < 78; i++) {
     const side = i % 2 === 0 ? -1 : 1;
-    const t = i / 46;
-    // two side bands + a back band behind each castle
     let x, z;
-    if (i < 32) { x = side * (7.6 + rng(i, 1) * 4.5); z = -10 + t * 2 * 20 + rng(i, 2) * 1.5; }
-    else { x = -9 + rng(i, 3) * 18; z = (i % 2 ? -11.5 : 10.8) + rng(i, 4) * 1.2; }
+    if (i < 52) { x = side * (6.4 + rng(i, 1) * 7.5); z = -12 + (i / 52) * 2 * 24 + rng(i, 2) * 1.6; }
+    else { x = -13 + rng(i, 3) * 26; z = (i % 2 ? -12.5 : 11.6) + rng(i, 4) * 1.6; }
     const model = F[Math.floor(rng(i, 5) * F.length)];
-    const s = 1.1 + rng(i, 6) * 1.3;
+    // forest-pack models are authored much larger than builder-pack buildings
+    const s = 0.34 + rng(i, 6) * 0.22;
     place(model, x, z, s, rng(i, 7) * 6.28);
   }
-  // grass tufts inside the field edges (subtle, non-blocking)
-  for (let i = 0; i < 14; i++) {
-    const g = F[8 + (i % 2)];                      // the two grass models
-    place(g, -6 + rng(i, 8) * 12, -7 + rng(i, 9) * 13, 0.9 + rng(i, 10) * 0.6, rng(i, 11) * 6.28);
+  // grass tufts inside the field (subtle, non-blocking)
+  for (let i = 0; i < 20; i++) {
+    const g = F[8 + (i % 2)];
+    place(g, -7 + rng(i, 8) * 14, -8 + rng(i, 9) * 15, 0.3 + rng(i, 10) * 0.18, rng(i, 11) * 6.28);
+  }
+  // prop dressing (skips anything that failed to load)
+  const put = (key, x, z, s, ry) => { if (P[key]) place(P[key], x, z, s, ry); };
+  // your castle yard: crates, barrels, blue flags
+  put('crate_A_big', -2.6, 8.6, 0.5); put('barrel', -3.3, 8.9, 0.5); put('barrel', -3.0, 8.2, 0.5);
+  put('flag_blue', 2.7, 8.4, 0.6); put('flag_blue', -2.2, 7.6, 0.6); put('bucket_water', 3.2, 8.9, 0.5);
+  put('bench', 3.6, 8.0, 1.0, Math.PI / 2);
+  // enemy castle yard: dark barrels, red flags, treasure
+  put('barrelDark', -2.8, -9.2, 1.0); put('barrelDark', -3.3, -8.7, 1.0);
+  put('flag_red', 2.7, -8.9, 0.6); put('flag_red', -2.3, -9.4, 0.6);
+  put('chest_common', 3.1, -9.1, 1.0, Math.PI);
+  put('banner', 0.0, -10.4, 1.2);
+  // fences along the river banks outside the bridges
+  for (const fx of [-5.6, -4.2, 4.2, 5.6]) {
+    put('fence_wood_straight', fx, bz(RIVER_T) - 0.5, 0.55);
+    put('fence_wood_straight', fx, bz(RIVER_B) + 0.5, 0.55);
   }
 }
 
@@ -328,7 +358,7 @@ export function toWorld(clientX, clientY) {
   raycaster.setFromCamera(ndc, cam);
   const hit = new THREE.Vector3();
   raycaster.ray.intersectPlane(groundPlane, hit);
-  return { x: hit.x * U + 380, y: hit.z * U + 540 };
+  return { x: hit.x * UX + 380, y: hit.z * UZ + 540 };
 }
 
 /** worldToScreen — battle coords -> CSS px (used by gates.js to anchor cards). */
