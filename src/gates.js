@@ -13,14 +13,22 @@
 // The old charge gate was cut (design feedback: interruptive, didn't fit).
 // Build-exact-N lives on in catapult-puzzle.html -> Training Grounds (E8).
 
-import { S, repairTower } from './battle.js';
+import { S, repairTower, addElixir } from './battle.js';
 import { worldToScreen } from './render2d.js';
 import { pickGateFact, scaffoldTier, recordAttempt } from './mastery.js';
 import { loadProfile, saveProfile, getActiveProfileId } from './store.js';
 
-// ─── starter fact pool: addition, addends 1-5, sums <= 10 ───────────────────
-const FACT_POOL = [];
+// ─── fact pools (E4 swaps these per arena via setFactPools) ──────────────────
+let FACT_POOL = [];
 for (let a = 1; a <= 5; a++) for (let b = 1; b <= 5; b++) FACT_POOL.push(a + '+' + b);
+let EARLIER_POOLS = [];
+
+/** setFactPools — arena system (E4) injects the current arena's pool and
+ *  earlier arenas' pools (for the 20% spaced-review stream). */
+export function setFactPools(pool, earlier) {
+  FACT_POOL = pool;
+  EARLIER_POOLS = earlier || [];
+}
 
 const IDLE_SUBMIT_MS = 1000;   // pause after last tap = submit
 const COOLDOWN_MS = 8000;      // per-board cooldown between repair cards
@@ -77,6 +85,21 @@ function injectStyles() {
   animation: gate-pip .15s cubic-bezier(.2,1.6,.6,1); }
 @keyframes gate-pip { from { transform: scale(0); } to { transform: scale(1); } }
 #gate-card .hint { font-size: 13px; font-weight: 700; color: #a4671b; min-height: 1.1em; }
+#gate-card .reward { font-size: 14px; font-weight: 900; color: #a4671b; }
+#gate-card .ans {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;
+}
+#gate-card .ans button {
+  background: #3a1a6e; border: 4px solid #5b3fa0; border-radius: 14px;
+  color: #fff; font-family: inherit;
+  font-size: clamp(22px, 5vw, 34px); font-weight: 900;
+  padding: 10px 6px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform .1s;
+}
+#gate-card .ans button:active { transform: scale(.93); }
+#gate-card .ans button.wrong { border-color: #e23b3b; background: #4a1025; }
+#gate-card .ans button.right { border-color: #22c24a; background: #143d1a; }
 #gate-card.wobble { animation: gate-wobble .4s ease; }
 @keyframes gate-wobble {
   0%,100% { transform: translate(-50%,-100%) rotate(0); }
@@ -123,32 +146,93 @@ function confettiAt(x, y) {
   }
 }
 
+// ─── answer-choice distractors (recall mode) ─────────────────────────────────
+function makeChoices(sum) {
+  const set = new Set([sum]);
+  for (const d of [sum - 1, sum + 1, sum - 2, sum + 2, sum + 3]) {
+    if (set.size >= 4) break;
+    if (d >= 1) set.add(d);
+  }
+  const arr = [...set];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // ─── card lifecycle ──────────────────────────────────────────────────────────
-function openCard(tower) {
+// reward: { type: 'repair', tower } | { type: 'elixir', tower } (tower = anchor)
+function openCard(reward) {
   const profile = getProfile();
   if (!profile) return;
 
-  const factId = pickGateFact(profile.facts, FACT_POOL, [], {});
+  const factId = pickGateFact(profile.facts, FACT_POOL, EARLIER_POOLS, {});
   const f = parseFact(factId);
   if (!f) return;
   const tier = scaffoldTier(profile.facts, factId);
+  // INPUT GRADUATES WITH MASTERY: T0/T1 = tap-to-count (production/counting stage),
+  // T2 = pick the answer (recall stage). The engine demotes on misses, so a
+  // guessed-wrong fact slides back to counting mode automatically.
+  const mode = tier >= 2 ? 'choose' : 'count';
 
-  cardState = { tower, profile, factId, ...f, count: 0, firstTapAt: 0, idleTimer: null, tier, missed: false };
+  cardState = { reward, profile, factId, ...f, mode, count: 0,
+    firstTapAt: mode === 'choose' ? Date.now() : 0, idleTimer: null, tier, missed: false };
 
   cardEl = document.createElement('div');
   cardEl.id = 'gate-card';
-  cardEl.innerHTML = `
-    <div class="eq">${f.a} + ${f.b} = ?</div>
-    <div class="dots"></div>
-    <div class="count">tap!</div>
-    <div class="pips"></div>
-    <div class="hint"></div>`;
-  // T0: dots from the start; T1: after a miss; T2: never (CURRICULUM.md scaffold tiers)
-  if (tier === 0) renderDots(cardEl.querySelector('.dots'), f.a, f.b);
+  const rewardLabel = reward.type === 'repair' ? '🔧 fix the tower!' : '⚡ win elixir!';
+  if (mode === 'count') {
+    cardEl.innerHTML = `
+      <div class="reward">${rewardLabel}</div>
+      <div class="eq">${f.a} + ${f.b} = ?</div>
+      <div class="dots"></div>
+      <div class="count">tap!</div>
+      <div class="pips"></div>
+      <div class="hint"></div>`;
+    // T0: dots from the start; T1: after a miss; T2: never (CURRICULUM.md scaffold tiers)
+    if (tier === 0) renderDots(cardEl.querySelector('.dots'), f.a, f.b);
+    cardEl.addEventListener('pointerdown', onTap);
+  } else {
+    cardEl.innerHTML = `
+      <div class="reward">${rewardLabel}</div>
+      <div class="eq">${f.a} + ${f.b} = ?</div>
+      <div class="ans"></div>
+      <div class="hint"></div>`;
+    const grid = cardEl.querySelector('.ans');
+    for (const choice of makeChoices(f.sum)) {
+      const b = document.createElement('button');
+      b.textContent = choice;
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (!cardState) return;
+        if (choice === f.sum) { b.classList.add('right'); resolve(true); }
+        else {
+          b.classList.add('wrong');
+          recordMissKeepCard();
+          setTimeout(() => b.classList.remove('wrong'), 600);
+        }
+      });
+      grid.appendChild(b);
+    }
+  }
 
-  cardEl.addEventListener('pointerdown', onTap);
   document.body.appendChild(cardEl);
   positionCard();
+}
+
+// choose-mode miss: record it, wobble, keep the same card up for retry
+function recordMissKeepCard() {
+  const cs = cardState;
+  if (!cs) return;
+  const elapsedMs = Date.now() - cs.firstTapAt;
+  recordAttempt(cs.profile.facts, cs.factId, false, elapsedMs,
+    { thresholdMs: cs.profile.settings.fluencyMs });
+  saveProfile(cs.profile);
+  cs.missed = true;
+  cardEl.classList.remove('wobble'); void cardEl.offsetWidth; cardEl.classList.add('wobble');
+  cardEl.querySelector('.hint').textContent = 'try again!';
+  setTimeout(() => { if (cardEl) cardEl.querySelector('.hint').textContent = ''; }, 1200);
 }
 
 function onTap(e) {
@@ -178,7 +262,8 @@ function resolve(correct) {
   saveProfile(cs.profile);
 
   if (correct) {
-    repairTower(cs.tower, HEAL_IS_SUM ? cs.sum : 1);
+    if (cs.reward.type === 'repair') repairTower(cs.reward.tower, HEAL_IS_SUM ? cs.sum : 1);
+    else addElixir(3);
     const r = cardEl.getBoundingClientRect();
     confettiAt(r.left + r.width / 2, r.top + r.height / 2);
     cardEl.classList.add('solved');
@@ -200,7 +285,7 @@ function resolve(correct) {
 
 function positionCard() {
   if (!cardEl || !cardState) return;
-  const t = cardState.tower;
+  const t = cardState.reward.tower;
   const p = worldToScreen(t.x, t.y - 80);
   cardEl.style.left = p.x + 'px';
   cardEl.style.top = p.y + 'px';
@@ -228,20 +313,25 @@ export function updateGates() {
   // game over: clear the card
   if (S.over) { if (cardEl) dismissCard(); return; }
 
-  // active card: keep it anchored; retire it if its tower died or got replaced
+  // active card: keep it anchored; retire it if its anchor tower died or got replaced
   if (cardEl) {
-    const t = cardState.tower;
+    const t = cardState.reward.tower;
     if (t.dead || !S.towers.includes(t)) { dismissCard(); return; }
     positionCard();
     return;
   }
 
-  // no card: maybe spawn one (most-damaged friendly tower, off cooldown)
+  // no card: maybe spawn one, off cooldown.
+  // Damaged tower -> repair card there. All healthy -> elixir card at your king.
   if (Date.now() < cooldownUntil) return;
   let worst = null;
   for (const t of S.towers) {
     if (t.side !== 'you' || t.dead || t.hp >= t.maxhp) continue;
     if (!worst || (t.maxhp - t.hp) > (worst.maxhp - worst.hp)) worst = t;
   }
-  if (worst) openCard(worst);
+  if (worst) { openCard({ type: 'repair', tower: worst }); return; }
+  if (S.elixir <= 7) {
+    const king = S.towers.find(t => t.side === 'you' && t.kind === 'king' && !t.dead);
+    if (king) openCard({ type: 'elixir', tower: king });
+  }
 }
