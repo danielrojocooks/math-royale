@@ -2,6 +2,22 @@
 // render2d.js reads S to draw; input.js calls the exported actions.
 import { LANE, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK, FOES, WORDS } from '../data/units.js';
 
+// ---- arena configuration (set by arenas.js via configureBattle before reset()) ----
+// foeMaxVal: upper bound on villain val the AI may spawn (default = uncapped).
+// bossSpawn: { spr, val } to drop on the foe side 1s after match start, or null.
+let _cfg = { foeMaxVal: Infinity, bossSpawn: null };
+
+/**
+ * configureBattle — called by the arena system before reset() to set match parameters.
+ * @param {{ foeMaxVal?: number, bossSpawn?: {spr:string, val:number}|null }} opts
+ */
+export function configureBattle({ foeMaxVal, bossSpawn } = {}) {
+  _cfg = {
+    foeMaxVal: foeMaxVal ?? Infinity,
+    bossSpawn: bossSpawn ?? null,
+  };
+}
+
 // ---- state (read by render, mutated only here) ----
 export const S = {
   towers: [], troops: [], parts: [], decals: [], pops: [],
@@ -22,6 +38,15 @@ export function reset() {
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
   S.sel = -1; S.shake = 0; S.over = null; S.T = 0; S.paused = false;
+
+  // ── Boss spawn: drop the boss unit on the foe side ~1s after match start.
+  if (_cfg.bossSpawn) {
+    const { spr, val } = _cfg.bossSpawn;
+    setTimeout(() => {
+      if (S.over) return; // match may have already ended (edge case)
+      mkTroop('foe', Math.floor(Math.random() * 2), 250, val, spr);
+    }, 1000);
+  }
 }
 
 // ---- FX spawners (state only; render draws them) ----
@@ -109,10 +134,11 @@ export function update(dt) {
   S.elixir = Math.min(10, S.elixir + dt / 1.6);
   S.foeElixir = Math.min(10, S.foeElixir + dt / 1.6);
 
-  // enemy AI: deploy a random affordable villain every few seconds
+  // enemy AI: deploy a random affordable villain every few seconds.
+  // foeMaxVal cap (from configureBattle) restricts which villains may spawn.
   S.foeTimer -= dt;
   if (S.foeTimer <= 0) {
-    const aff = FOES.filter(f => f.val <= S.foeElixir);
+    const aff = FOES.filter(f => f.val <= S.foeElixir && f.val <= _cfg.foeMaxVal);
     if (aff.length) {
       const f = aff[Math.floor(Math.random() * aff.length)];
       S.foeElixir -= f.val;
