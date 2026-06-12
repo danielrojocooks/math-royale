@@ -333,7 +333,8 @@ export function updateGates() {
     if (!worst || (t.maxhp - t.hp) > (worst.maxhp - worst.hp)) worst = t;
   }
   if (worst) { openCard({ type: 'repair', tower: worst }); return; }
-  if (S.elixir <= 7) {
+  // power card is (nearly) always available — the math should never be absent
+  if (S.elixir < 10) {
     const king = S.towers.find(t => t.side === 'you' && t.kind === 'king' && !t.dead);
     if (king) openCard({ type: 'elixir', tower: king });
   }
