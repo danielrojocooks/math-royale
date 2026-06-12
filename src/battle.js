@@ -104,6 +104,7 @@ function mkTroop(side, lane, y, val, spr, xoff) {
     side, lane, x: LANE[lane] + (xoff || 0), y, val, maxval: val, spr,
     pop: 0, flash: 0, hit: 0, atk: 0, atkcd: .3, struck: false,
     walk: Math.random() * 6.28, dust: 0, moving: false, dead: false, dying: 0,
+    duelWith: null, duelT: 0, dueling: false,
   });
   burst(LANE[lane], y, side === 'you' ? '#7ec8ff' : '#ff9a9a', 12, 150);
   for (let i = 0; i < 8; i++) {
@@ -185,6 +186,27 @@ export function update(dt) {
     if (t.hit > 0) t.hit -= dt;
     if (t.dead) { t.dying -= dt; continue; }
     if (t.pop < 1) t.pop = Math.min(1, t.pop + dt * 5);
+    // Dueling: locked with an opponent — stand and trade blows until the timer
+    // resolves the math (see combat pass). Partner died elsewhere? Resume.
+    if (t.duelWith) {
+      if (t.duelWith.dead) { t.duelWith = null; t.dueling = false; }
+      else {
+        t.dueling = true; t.moving = false;
+        if (t.atk > 0) {
+          t.atk -= dt;
+          if (!t.struck && t.atk <= .18) {          // blow lands: sparks + hit-react
+            t.struck = true;
+            const mx = (t.x + t.duelWith.x) / 2, my = (t.y + t.duelWith.y) / 2;
+            burst(mx, my, '#fff', 4, 160); ring(mx, my, '#ffe14d');
+            t.duelWith.hit = .2;
+          }
+        } else {
+          t.atkcd -= dt;
+          if (t.atkcd <= 0) { t.atk = .36; t.struck = false; t.atkcd = .55 + Math.random() * .3; }
+        }
+        continue;
+      }
+    } else t.dueling = false;
     // Target acquisition: chase the nearest living enemy in this lane (EITHER
     // direction) — so defenders turn around for invaders that slipped past —
     // and only march on towers when no enemy is near.
@@ -225,17 +247,32 @@ export function update(dt) {
     }
   }
 
-  // troop-vs-troop combat: subtraction; equal numbers annihilate
+  // troop-vs-troop combat: meeting troops LOCK INTO A DUEL (trade animated blows
+  // ~1.7s), THEN the math resolves: subtraction; equal numbers annihilate.
   for (let i = 0; i < S.troops.length; i++) {
     const a = S.troops[i]; if (a.dead || a.side !== 'you') continue;
-    for (let j = 0; j < S.troops.length; j++) {
-      const b = S.troops[j]; if (b.dead || b.side !== 'foe' || b.lane !== a.lane) continue;
-      if (Math.abs(a.y - b.y) < 48) {
+    // resolve an expired duel
+    if (a.duelWith && !a.duelWith.dead) {
+      a.duelT -= dt;
+      if (a.duelT <= 0) {
+        const b = a.duelWith;
         const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
         ring(cx, cy, '#fff'); burst(cx, cy, '#fff', 8, 180);
         if (a.val === b.val) { kill(a); kill(b); popup(cx, cy, '0', '#fff'); }
-        else if (a.val > b.val) { a.val -= b.val; a.flash = .25; a.hit = .26; kill(b); popup(a.x, a.y - 40, a.val, '#bff'); }
-        else { b.val -= a.val; b.flash = .25; b.hit = .26; kill(a); popup(b.x, b.y - 40, b.val, '#fbb'); }
+        else if (a.val > b.val) { a.val -= b.val; a.flash = .25; a.hit = .26; kill(b); popup(a.x, a.y - 40, a.val, '#bff'); a.duelWith = null; a.dueling = false; }
+        else { b.val -= a.val; b.flash = .25; b.hit = .26; kill(a); popup(b.x, b.y - 40, b.val, '#fbb'); b.duelWith = null; b.dueling = false; }
+      }
+      continue;
+    }
+    // pair up free troops that meet
+    for (let j = 0; j < S.troops.length; j++) {
+      const b = S.troops[j]; if (b.dead || b.side !== 'foe' || b.lane !== a.lane || b.duelWith) continue;
+      if (Math.abs(a.y - b.y) < 48) {
+        a.duelWith = b; b.duelWith = a;
+        a.duelT = 1.7;
+        a.atk = .36; a.struck = false; a.atkcd = .8;          // strike immediately
+        b.atk = 0; b.struck = false; b.atkcd = .3;            // counter-swing offset
+        break;
       }
     }
   }

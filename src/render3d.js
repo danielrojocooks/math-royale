@@ -396,7 +396,7 @@ function syncTroops(S, dt) {
     v.obj.position.set(bx(t.x), 0, bz(t.y));
     // Honest facing while moving/attacking (no angled moonwalk); 3/4 turn toward
     // the camera when standing still so faces get their moments.
-    const busy = t.moving || t.atk > 0;
+    const busy = t.moving || t.atk > 0 || t.dueling;
     v.obj.rotation.y = t.side === 'you' ? (busy ? Math.PI : Math.PI * 0.45)
                                         : (busy ? 0 : -0.4);
     if (v.badgeVal !== t.val) {                          // number changed after combat
