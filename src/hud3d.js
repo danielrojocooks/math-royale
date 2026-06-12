@@ -66,8 +66,10 @@ function injectStyles() {
   #hud .card.sel { transform: translateX(-7px); }
 }
 .hud-pop { position: fixed; z-index: 45; pointer-events: none;
-  font-family: "Trebuchet MS","Segoe UI",sans-serif; font-weight: 900;
-  text-shadow: 0 2px 4px rgba(0,0,0,.8); transform: translate(-50%, -50%); }
+  font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", "Trebuchet MS", cursive;
+  font-weight: 900; font-style: italic; letter-spacing: 1px;
+  -webkit-text-stroke: 1.5px rgba(0,0,0,.85);
+  text-shadow: 2px 2px 0 rgba(0,0,0,.6); transform: translate(-50%, -50%); }
 #hud-banner { position: fixed; inset: 0; z-index: 48; display: none;
   align-items: center; justify-content: center; flex-direction: column;
   background: rgba(10,6,28,.72); pointer-events: none;
@@ -148,7 +150,9 @@ export function updateHud(S) {
     if (!el) {
       el = document.createElement('div'); el.className = 'hud-pop';
       el.textContent = q.text; el.style.color = q.color;
-      el.style.fontSize = (q.big ? 34 : 22) + 'px';
+      el.style.fontSize = (q.big ? 25 : 16) + 'px';
+      // comic-panel tilt, randomized per pop
+      el.style.transform = 'translate(-50%, -50%) rotate(' + (Math.random() * 16 - 8).toFixed(1) + 'deg)';
       document.body.appendChild(el); popEls.set(q, el);
     }
     const p = worldToScreen(q.x, q.y);
