@@ -1,7 +1,8 @@
 // src/hud3d.js — DOM HUD for the 3D renderer: card hand, elixir bar, damage
 // popups, win/lose banner. The 2D unit portraits become the card art.
 // Reads battle state S each frame; player actions go through battle exports.
-import { DECK, PANEL_Y } from '../data/units.js';
+// Card list comes from battle.S.deck (set dynamically) — not the static DECK.
+import { PANEL_Y } from '../data/units.js';
 import * as battle from './battle.js';
 import { worldToScreen, getPortraits } from './render3d.js';
 
@@ -102,9 +103,17 @@ export function initHud() {
 
   const cards = document.createElement('div'); cards.className = 'cards';
   cardEls = [];
-  DECK.forEach((d, i) => {
+  // battle.S.deck is set by setDeck() before reset(); falls back to data/units.js DECK.
+  const deck = battle.S.deck;
+  deck.forEach((d, i) => {
     const el = document.createElement('div'); el.className = 'card';
-    el.innerHTML = `<span class="cost">${d.cost ?? d.val}</span><img src="assets/fantasy_t/clean/${d.spr}.png" alt="${d.name}">`;
+    const img = document.createElement('img');
+    img.src = 'assets/fantasy_t/clean/' + d.spr + '.png';
+    img.alt = d.name;
+    // unit_rogue 2D art may not exist yet — hide the img gracefully until the 3D portrait arrives.
+    img.onerror = () => { img.style.display = 'none'; };
+    el.innerHTML = `<span class="cost">${d.cost ?? d.val}</span>`;
+    el.appendChild(img);
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
       if (battle.S.over) return;
@@ -119,8 +128,11 @@ export function initHud() {
   // once they're loaded; the 2D art is just the placeholder until then.
   getPortraits().then(p => {
     cardEls.forEach((el, i) => {
-      const url = p[DECK[i].spr];
-      if (url) el.querySelector('img').src = url;
+      const url = p[deck[i].spr];
+      if (url) {
+        const imgEl = el.querySelector('img');
+        if (imgEl) { imgEl.style.display = ''; imgEl.src = url; }
+      }
     });
   });
 
@@ -138,7 +150,9 @@ export function updateHud(S) {
   elixNum.textContent = e;
   elixCells.forEach((c, i) => c.classList.toggle('on', i < e));
   cardEls.forEach((el, i) => {
-    el.classList.toggle('dim', (DECK[i].cost ?? DECK[i].val) > S.elixir);
+    const d = S.deck[i];
+    if (!d) return;
+    el.classList.toggle('dim', (d.cost ?? d.val) > S.elixir);
     el.classList.toggle('sel', S.sel === i);
   });
 

@@ -21,6 +21,8 @@ import { initGates, updateGates, setFactPools } from './gates.js';
 import { showArenaSelect, handleBossWin, ensureProgress, buildPools } from './arenas.js';
 import { getArena } from '../data/arenas.js';
 import { loadProfile } from './store.js';
+import { showDeckScreen } from './deck-ui.js';
+import { byId } from '../data/roster.js';
 
 const canvas = document.getElementById('c');
 initRender(canvas);
@@ -58,6 +60,7 @@ function openArenaSelect(profile) {
     fresh,
     (arenaId) => startMatch(fresh, arenaId, false),
     (arenaId) => startMatch(fresh, arenaId, true),
+    () => showDeckScreen(fresh, () => openArenaSelect(fresh)),
   );
 }
 
@@ -76,21 +79,28 @@ function startMatch(profile, arenaId, isBoss) {
     bossSpawn: isBoss ? { spr: arena.boss.spr, val: arena.boss.val } : null,
   });
 
-  // 2. Wire fact pools into gates so repair cards draw arena-correct facts.
+  // 2. Resolve profile.deck ids through the roster and arm the active deck.
+  //    Falls back to the data/units.js default if profile has no deck yet.
+  const deckIds = Array.isArray(profile.deck) && profile.deck.length
+    ? profile.deck : ['archers', 'knights', 'spearman'];
+  const deckEntries = deckIds.map(id => byId(id)).filter(Boolean);
+  if (deckEntries.length) battle.setDeck(deckEntries);
+
+  // 3. Wire fact pools into gates so repair cards draw arena-correct facts.
   const { currentPool, earlierPools } = buildPools(arenaId);
   setFactPools(currentPool, earlierPools);
 
-  // 3. Reset + init.
+  // 4. Reset + init (reset() copies _activeDeck -> S.deck).
   battle.reset();
   initGates();
   initHud();
 
-  // 4. Cancel any previous loop; clear stale intercept.
+  // 5. Cancel any previous loop; clear stale intercept.
   if (_rafId !== null) cancelAnimationFrame(_rafId);
   removeCaptureListener();
   _matchEndHandled = false;
 
-  // 5. Frame loop.
+  // 6. Frame loop.
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000);

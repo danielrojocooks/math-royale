@@ -1,6 +1,18 @@
 // Battle simulation: all game state and rules. NO rendering, NO DOM, NO canvas.
 // render2d.js reads S to draw; input.js calls the exported actions.
-import { LANE, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK, FOES, WORDS } from '../data/units.js';
+import { LANE, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK as DEFAULT_DECK, FOES, WORDS } from '../data/units.js';
+
+// ---- active deck (set by setDeck; defaults to data/units.js DECK) ----
+let _activeDeck = DEFAULT_DECK;
+
+/**
+ * setDeck — set the cards used in the next (and current) battle.
+ * Pass an array of roster entries (each with .name/.spr/.cost/.count/.val).
+ * @param {Array} cards
+ */
+export function setDeck(cards) {
+  _activeDeck = Array.isArray(cards) && cards.length ? cards : DEFAULT_DECK;
+}
 
 // ---- arena configuration (set by arenas.js via configureBattle before reset()) ----
 // foeMaxVal: upper bound on villain val the AI may spawn (default = uncapped).
@@ -24,6 +36,7 @@ export const S = {
   elixir: 5, foeElixir: 5, foeTimer: 2.5,
   sel: -1, shake: 0, over: null, T: 0,
   paused: false,  // set true while a gate modal is open; update() skips sim
+  deck: DEFAULT_DECK,  // mirrors _activeDeck; renderers/HUD read this
 };
 
 function tower(side, kind, x, y, lane, hp) {
@@ -31,6 +44,9 @@ function tower(side, kind, x, y, lane, hp) {
 }
 
 export function reset() {
+  // Sync the public deck snapshot so renderers always see the current deck.
+  S.deck = _activeDeck;
+
   // Castles spread further apart -> longer marches, more board to play
   S.towers = [
     tower('foe', 'prin', LANE[0], 205, 0, 14), tower('foe', 'prin', LANE[1], 205, 1, 14), tower('foe', 'king', 380, 65, -1, 24),
@@ -102,13 +118,13 @@ function oppTower(side, lane) {
 
 // ---- player actions (called by input.js) ----
 export function trySelectCard(i) {
-  if ((DECK[i].cost ?? DECK[i].val) <= S.elixir) { S.sel = i; return true; }
+  if ((_activeDeck[i].cost ?? _activeDeck[i].val) <= S.elixir) { S.sel = i; return true; }
   S.shake = .12; return false;
 }
 export function tryDeploy(x, y) {
   // Anywhere on YOUR half counts (CR rule); the drop point clamps into the deploy band.
   if (S.sel < 0 || y < RIVER_B + 10) return false;
-  const d = DECK[S.sel];
+  const d = _activeDeck[S.sel];
   const cost = d.cost ?? d.val;
   if (cost > S.elixir) return false;
   S.elixir -= cost;

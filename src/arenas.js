@@ -329,8 +329,9 @@ function showUnlockCelebration(unlocks, onDone) {
  * @param {Object}   profile   — full profile object (may lack .progress)
  * @param {Function} onPlay    — onPlay(arenaId) → starts a normal match
  * @param {Function} onBoss    — onBoss(arenaId) → starts a boss match
+ * @param {Function} [onDeck]  — optional; called when player taps MY TEAM button
  */
-export function showArenaSelect(profile, onPlay, onBoss) {
+export function showArenaSelect(profile, onPlay, onBoss, onDeck) {
   injectStyles();
   ensureProgress(profile);
   const p = profile.progress;
@@ -350,6 +351,20 @@ export function showArenaSelect(profile, onPlay, onBoss) {
   sub.className = 'arena-subtitle';
   sub.textContent = 'Beat the boss to unlock the next world!';
   ov.appendChild(sub);
+
+  // MY TEAM button (only if callback provided)
+  if (onDeck) {
+    const teamBtn = document.createElement('button');
+    teamBtn.className = 'arena-btn arena-btn-play';
+    teamBtn.style.cssText = 'margin-bottom:16px;max-width:220px;padding:12px 20px;font-size:clamp(15px,3.5vw,20px);';
+    teamBtn.textContent = '🎒 MY TEAM';
+    teamBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      ov.remove();
+      onDeck();
+    });
+    ov.appendChild(teamBtn);
+  }
 
   // Render a card per arena
   for (const arena of ARENAS) {

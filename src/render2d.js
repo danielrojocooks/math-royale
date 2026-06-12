@@ -1,13 +1,20 @@
 // All canvas drawing. Reads battle state S; never mutates game state.
 // Also owns the screen transform (toWorld) and panel layout (cardRect) used by input.js.
-import { W, H, LANE, RIVER_T, RIVER_B, PANEL_Y, DECK, FOES } from '../data/units.js';
+// Card list is read from S.deck (set dynamically by battle.setDeck); DECK from units.js
+// is only used for the initial enemy sprite pre-load.
+import { W, H, LANE, RIVER_T, RIVER_B, PANEL_Y, FOES } from '../data/units.js';
 
 let cv, ctx, DPR = 1, SC = 1, OX = 0, OY = 0;
 
 // ---- sprites ----
 const SPR = {};
-for (const u of [...DECK, ...FOES]) {
+// Pre-load foe sprites; deck sprites are loaded lazily in ensureSpr().
+for (const u of FOES) {
   if (!SPR[u.spr]) { const im = new Image(); im.src = 'assets/fantasy_t/clean/' + u.spr + '.png'; SPR[u.spr] = im; }
+}
+// Lazily ensure a sprite is loaded (noop if already in SPR).
+function ensureSpr(spr) {
+  if (!SPR[spr]) { const im = new Image(); im.src = 'assets/fantasy_t/clean/' + spr + '.png'; SPR[spr] = im; }
 }
 function spriteW(name, h) { const im = SPR[name]; return (im && im.naturalWidth) ? h * im.naturalWidth / im.naturalHeight : h * 0.7; }
 function drawSpr(name, h) {
@@ -33,7 +40,7 @@ export function toWorld(clientX, clientY) { return { x: (clientX * DPR - OX) / S
 export function worldToScreen(worldX, worldY) {
   return { x: (worldX * SC + OX) / DPR, y: (worldY * SC + OY) / DPR };
 }
-export function cardRect(i) { const w = 160, gap = 14, x0 = (W - (4 * w + 3 * gap)) / 2; return { x: x0 + i * (w + gap), y: PANEL_Y + 58, w, h: 132 }; }
+export function cardRect(i, n) { const w = 160, gap = 14, cnt = n ?? 3; const x0 = (W - (cnt * w + (cnt - 1) * gap)) / 2; return { x: x0 + i * (w + gap), y: PANEL_Y + 58, w, h: 132 }; }
 
 // ---- draw helpers ----
 function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
@@ -91,6 +98,7 @@ export function render(S) {
   // troops (painter's order, procedural animation)
   S.troops.sort((a, b) => a.y - b.y);
   for (const t of S.troops) {
+    ensureSpr(t.spr);  // lazy-load troop sprites (e.g. unit_rogue deployed mid-battle)
     const hh = (46 + t.maxval * 10) * (0.6 + 0.4 * t.pop), w = spriteW(t.spr, hh), fdir = t.side === 'you' ? -1 : 1;
     let bob = 0, lean = 0, sqx = 1, sqy = 1, alpha = 1, lung = 0;
     if (t.dead) { const k = 1 - Math.max(0, t.dying) / 0.16; alpha = Math.max(0, 1 - k); sqx = sqy = 1 + k * 0.9; }
@@ -140,8 +148,11 @@ export function render(S) {
   ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.font = '900 22px Trebuchet MS'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(Math.floor(S.elixir), 34, ey + eh / 2 + 1);
-  for (let i = 0; i < DECK.length; i++) {
-    const r = cardRect(i), d = DECK[i], aff = (d.cost ?? d.val) <= S.elixir, sel = S.sel === i;
+  const deck = S.deck;
+  for (let i = 0; i < deck.length; i++) {
+    const d = deck[i];
+    ensureSpr(d.spr);  // lazy-load any new sprite (e.g. unit_rogue)
+    const r = cardRect(i, deck.length), aff = (d.cost ?? d.val) <= S.elixir, sel = S.sel === i;
     ctx.save(); if (sel) ctx.translate(0, -12); ctx.globalAlpha = aff ? 1 : .5;
     g = ctx.createLinearGradient(0, r.y, 0, r.y + r.h); g.addColorStop(0, '#fff4d6'); g.addColorStop(1, '#ffd98a');
     ctx.fillStyle = g; rr(r.x, r.y, r.w, r.h, 16); ctx.fill();
