@@ -7,6 +7,7 @@ export const S = {
   towers: [], troops: [], parts: [], decals: [], pops: [],
   elixir: 5, foeElixir: 5, foeTimer: 2.5,
   sel: -1, shake: 0, over: null, T: 0,
+  paused: false,  // set true while a gate modal is open; update() skips sim
 };
 
 function tower(side, kind, x, y, lane, hp) {
@@ -20,7 +21,7 @@ export function reset() {
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
-  S.sel = -1; S.shake = 0; S.over = null; S.T = 0;
+  S.sel = -1; S.shake = 0; S.over = null; S.T = 0; S.paused = false;
 }
 
 // ---- FX spawners (state only; render draws them) ----
@@ -87,11 +88,24 @@ export function tryDeploy(x, y) {
   S.sel = -1; return true;
 }
 
+// ---- gate exports ----
+
+/** repairTower — heal a friendly tower by amount (capped at maxhp). */
+export function repairTower(tower, amount) {
+  tower.hp = Math.min(tower.maxhp, tower.hp + amount);
+}
+
+/** addElixir — add n elixir to the player, capped at 10. */
+export function addElixir(n) {
+  S.elixir = Math.min(10, S.elixir + n);
+}
+
 // ---- simulation ----
 export function update(dt) {
   S.T += dt;
   if (S.shake > 0) S.shake = Math.max(0, S.shake - dt);
   if (S.over) { decay(dt); return; }
+  if (S.paused) return;  // gate is open — freeze simulation (decay also skipped for clean freeze)
   S.elixir = Math.min(10, S.elixir + dt / 1.6);
   S.foeElixir = Math.min(10, S.foeElixir + dt / 1.6);
 

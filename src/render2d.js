@@ -29,6 +29,10 @@ function resize() {
   OX = (innerWidth * DPR - W * SC) / 2; OY = (innerHeight * DPR - H * SC) / 2;
 }
 export function toWorld(clientX, clientY) { return { x: (clientX * DPR - OX) / SC, y: (clientY * DPR - OY) / SC }; }
+/** worldToScreen — inverse of toWorld. Returns CSS pixel position for a logical (world) point. */
+export function worldToScreen(worldX, worldY) {
+  return { x: (worldX * SC + OX) / DPR, y: (worldY * SC + OY) / DPR };
+}
 export function cardRect(i) { const w = 160, gap = 14, x0 = (W - (4 * w + 3 * gap)) / 2; return { x: x0 + i * (w + gap), y: PANEL_Y + 58, w, h: 132 }; }
 
 // ---- draw helpers ----
