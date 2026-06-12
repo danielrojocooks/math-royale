@@ -46,7 +46,7 @@ function injectStyles() {
   s.textContent = `
 #gate-card {
   position: fixed; z-index: 60;
-  transform: translate(-50%, -100%);
+  left: 14px; top: 14px;             /* fixed home in the unused upper-left corner */
   background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
   border: 3px solid rgba(255,207,77,.75);
@@ -62,8 +62,8 @@ function injectStyles() {
   user-select: none; -webkit-user-select: none;
   animation: gate-drop-in .3s cubic-bezier(.2,1.4,.6,1);
 }
-@keyframes gate-drop-in { from { transform: translate(-50%,-140%) scale(.6); opacity: 0; }
-                          to   { transform: translate(-50%,-100%) scale(1);  opacity: 1; } }
+@keyframes gate-drop-in { from { transform: translateY(-30px) scale(.6); opacity: 0; }
+                          to   { transform: translateY(0) scale(1);  opacity: 1; } }
 #gate-card .eq {
   font-size: clamp(19px, 4vw, 27px);
   font-weight: 900; color: #5a3a10;
@@ -103,14 +103,14 @@ function injectStyles() {
 #gate-card .ans button.right { border-color: #22c24a; background: #143d1a; }
 #gate-card.wobble { animation: gate-wobble .4s ease; }
 @keyframes gate-wobble {
-  0%,100% { transform: translate(-50%,-100%) rotate(0); }
-  25% { transform: translate(-52%,-100%) rotate(-4deg); }
-  75% { transform: translate(-48%,-100%) rotate(4deg); }
+  0%,100% { transform: rotate(0); }
+  25% { transform: translateX(-6px) rotate(-4deg); }
+  75% { transform: translateX(6px) rotate(4deg); }
 }
 #gate-card.solved { animation: gate-solved .5s ease forwards; pointer-events: none; }
 @keyframes gate-solved {
-  30% { transform: translate(-50%,-110%) scale(1.15); }
-  100% { transform: translate(-50%,-160%) scale(.4); opacity: 0; }
+  30% { transform: scale(1.15); }
+  100% { transform: translateY(-50px) scale(.4); opacity: 0; }
 }
 .gate-confetti { position: fixed; width: 9px; height: 9px; z-index: 61;
   pointer-events: none; border-radius: 2px; animation: gate-conf .7s ease-out forwards; }
@@ -285,17 +285,7 @@ function resolve(correct) {
 }
 
 function positionCard() {
-  if (!cardEl || !cardState) return;
-  const t = cardState.reward.tower;
-  const p = worldToScreen(t.x, t.y - 40);
-  // Float over the empty meadow BESIDE the tower, not on top of the lane:
-  // left-lane towers push the card left, right-lane right; the king splits left.
-  const side = t.x < 380 ? -1 : (t.x > 380 ? 1 : -1);
-  const margin = 90;
-  let x = p.x + side * 150;
-  x = Math.max(margin, Math.min(innerWidth - margin - 80, x));  // keep on screen (landscape HUD rail too)
-  cardEl.style.left = x + 'px';
-  cardEl.style.top = p.y + 'px';
+  // Fixed CSS home (upper-left corner) — fully off the battlefield by design.
 }
 
 function dismissCard() {
