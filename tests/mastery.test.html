@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>mastery.js — unit tests</title>
+  <style>
+    body { font-family: monospace; padding: 1rem; background: #111; color: #ccc; }
+    .pass { color: #4c4; }
+    .fail { color: #f44; font-weight: bold; }
+    .group { margin-top: 1rem; color: #aaf; font-weight: bold; }
+    #summary { margin-top: 1.5rem; font-size: 1.4rem; font-weight: bold; }
+  </style>
+</head>
+<body>
+<script type="module">
+import {
+  recordAttempt,
+  isFluent,
+  scaffoldTier,
+  pickGateFact,
+  arenaFluentPct,
+} from '../src/mastery.js';
+
+// ─── assert helpers ────────────────────────────────────────────────────────
+let passed = 0, failed = 0;
+
+function assert(cond, label) {
+  const el = document.createElement('div');
+  el.className = cond ? 'pass' : 'fail';
+  el.textContent = (cond ? '  PASS' : '  FAIL') + '  ' + label;
+  document.body.appendChild(el);
+  cond ? passed++ : failed++;
+}
+
+function group(name) {
+  const el = document.createElement('div');
+  el.className = 'group';
+  el.textContent = '— ' + name;
+  document.body.appendChild(el);
+}
+
+// Shorthand: build a fresh facts map and record N attempts.
+// Returns { facts, s } where s = facts[factId].
+function buildFacts(factId, attempts, opts = {}) {
+  const facts = {};
+  let s;
+  for (const { correct, ms } of attempts) {
+    s = recordAttempt(facts, factId, correct, ms, opts);
+  }
+  return { facts, s };
+}
+
+// Convenience: all-correct with same ms
+function allCorrect(n, ms) {
+  return Array.from({ length: n }, () => ({ correct: true, ms }));
+}
+function allMiss(n) {
+  return Array.from({ length: n }, () => ({ correct: false, ms: 9999 }));
+}
+
+// Base timestamps so tests never use real Date.now()
+const T0 = 1_000_000_000_000; // arbitrary fixed reference
+
+// ─── 1. FLUENCY RULE ───────────────────────────────────────────────────────
+group('1. Fluency: last 3 correct AND median time < threshold');
+
+{
+  // 3 correct at 1000 ms each — well under 8000 ms threshold
+  const { facts, s } = buildFacts('3+4', allCorrect(3, 1000), { now: T0 });
+  assert(s.fluent === true,      '3 correct @ 1000 ms → fluent=true');
+  assert(isFluent(facts, '3+4', { now: T0 }), 'isFluent agrees');
+}
+
+{
+  // Only 2 correct — not enough for last3 window
+  const { facts, s } = buildFacts('3+4', allCorrect(2, 1000), { now: T0 });
+  assert(s.fluent === false, 'Only 2 correct → not fluent yet');
+}
+
+{
+  // 3 correct but third was wrong — last3 = [T,T,F]
+  const attempts = [
+    { correct: true,  ms: 1000 },
+    { correct: true,  ms: 1000 },
+    { correct: false, ms: 1000 },
+  ];
+  const { facts, s } = buildFacts('5-2', attempts, { now: T0 });
+  assert(s.fluent === false, 'Miss on 3rd wipes fluent');
+}
+
+// ─── 2. NOT FLUENT WHEN TIMES TOO SLOW ────────────────────────────────────
+group('2. Not fluent when median response time >= threshold');
+
+{
+  // 3 correct but each takes 9000 ms (threshold default 8000)
+  const { facts, s } = buildFacts('3+4', allCorrect(3, 9000), { now: T0 });
+  assert(s.fluent === false, '3 correct @ 9000 ms (>= 8000) → not fluent');
+}
+
+{
+  // 3 correct at exactly 8000 ms — median = 8000, NOT < 8000
+  const { facts, s } = buildFacts('7-3', allCorrect(3, 8000), { now: T0 });
+  assert(s.fluent === false, '3 correct @ exactly 8000 ms → not fluent (needs <)');
+}
+
+{
+  // Mixed times: [1000, 9000, 1000] → sorted [1000, 1000, 9000] → median 1000 < 8000
+  const attempts = [
+    { correct: true, ms: 1000 },
+    { correct: true, ms: 9000 },
+    { correct: true, ms: 1000 },
+  ];
+  const { facts, s } = buildFacts('4+3', attempts, { now: T0 });
+  assert(s.fluent === true, 'Mixed [1000,9000,1000] → median 1000 → fluent');
+}
+
+// ─── 3. FAST-PASS ─────────────────────────────────────────────────────────
+group('3. Fast-pass: first 2 exposures both correct in < threshold/2');
+
+{
+  // threshold=8000, half=4000; both at 2000 ms → fast-pass
+  const attempts = [
+    { correct: true, ms: 2000 },
+    { correct: true, ms: 2000 },
+  ];
+  const { facts, s } = buildFacts('6+2', attempts, { now: T0, thresholdMs: 8000 });
+  assert(s.fluent === true, 'Fast-pass: 2 correct at 2000 ms (< 4000) → fluent');
+}
+
+{
+  // First fast, second slow (5000 >= 4000) → no fast-pass
+  const attempts = [
+    { correct: true, ms: 2000 },
+    { correct: true, ms: 5000 },
+  ];
+  const { facts, s } = buildFacts('6+2', attempts, { now: T0, thresholdMs: 8000 });
+  assert(s.fluent === false, 'Fast-pass: 2nd answer slow → no fast-pass');
+}
+
+{
+  // First correct+fast, second is a MISS → no fast-pass
+  const attempts = [
+    { correct: true,  ms: 2000 },
+    { correct: false, ms: 2000 },
+  ];
+  const { facts, s } = buildFacts('9-4', attempts, { now: T0, thresholdMs: 8000 });
+  assert(s.fluent === false, 'Fast-pass: 2nd answer wrong → no fast-pass');
+}
+
+{
+  // Exactly at half threshold (4000) → NOT < threshold/2, no fast-pass
+  const attempts = [
+    { correct: true, ms: 4000 },
+    { correct: true, ms: 4000 },
+  ];
+  const { facts, s } = buildFacts('8-5', attempts, { now: T0, thresholdMs: 8000 });
+  assert(s.fluent === false, 'Fast-pass: exactly at threshold/2 → no fast-pass (needs <)');
+}
+
+{
+  // Fast-pass requires FIRST 2 exposures — 3rd attempt cannot trigger it
+  const attempts = [
+    { correct: false, ms: 2000 }, // miss first
+    { correct: true,  ms: 2000 },
+    { correct: true,  ms: 2000 },
+  ];
+  const { facts, s } = buildFacts('5+3', attempts, { now: T0, thresholdMs: 8000 });
+  // should NOT be fluent (only 2 correct in last3, not 3 consecutive)
+  assert(s.fluent === false, 'Fast-pass: first attempt a miss → cannot fast-pass on 2nd+3rd');
+}
+
+// ─── 4. SCAFFOLD TIER ─────────────────────────────────────────────────────
+group('4. Scaffold tier: startTier, drops on 2 consecutive correct, rises on 2 consecutive misses, clamps');
+
+{
+  // Default startTier=0 for unseen fact
+  const facts = {};
+  assert(scaffoldTier(facts, '3+4') === 0, 'Unseen fact defaults to tier 0');
+  assert(scaffoldTier(facts, '3+4', { startTier: 2 }) === 2, 'Unseen fact with startTier=2 returns 2');
+}
+
+{
+  // P1 start T0: 2 consecutive correct → drop to -1 but clamped to 0
+  const { s } = buildFacts('2+1', allCorrect(2, 1000), { now: T0, startTier: 0 });
+  assert(s.tier === 0, 'T0: 2 consecutive correct → clamps at 0 (cannot go below)');
+}
+
+{
+  // P2 start T2: 2 consecutive correct → T1
+  const { s } = buildFacts('3x5', allCorrect(2, 1000), { now: T0, startTier: 2 });
+  assert(s.tier === 1, 'T2: 2 consecutive correct → T1');
+}
+
+{
+  // T2: 4 consecutive correct → T1 after 2, then T0 after 2 more
+  const { s } = buildFacts('4x3', allCorrect(4, 1000), { now: T0, startTier: 2 });
+  assert(s.tier === 0, 'T2: 4 consecutive correct → T0');
+}
+
+{
+  // T0: 2 consecutive misses → T1
+  const { s } = buildFacts('7+8', allMiss(2), { now: T0, startTier: 0 });
+  assert(s.tier === 1, 'T0: 2 consecutive misses → T1');
+}
+
+{
+  // T0: 4 consecutive misses → T1 then T2
+  const { s } = buildFacts('9+9', allMiss(4), { now: T0, startTier: 0 });
+  assert(s.tier === 2, 'T0: 4 consecutive misses → T2');
+}
+
+{
+  // T2: 2 consecutive misses → clamps at 2
+  const { s } = buildFacts('10-8', allMiss(2), { now: T0, startTier: 2 });
+  assert(s.tier === 2, 'T2: 2 consecutive misses → clamps at 2 (cannot go above)');
+}
+
+{
+  // Tier resets streak on movement: T2, 2 correct → T1 (streak resets), 1 correct → no move yet
+  const facts = {};
+  recordAttempt(facts, 'f1', true,  1000, { now: T0, startTier: 2 });
+  recordAttempt(facts, 'f1', true,  1000, { now: T0, startTier: 2 }); // → T1, streak reset
+  recordAttempt(facts, 'f1', true,  1000, { now: T0, startTier: 2 }); // streak=1, no move yet
+  assert(facts['f1'].tier === 1, 'After tier drop, need 2 MORE correct to drop again');
+}
+
+{
+  // Tier move resets: correct/miss alternating should never trigger
+  const facts = {};
+  for (let i = 0; i < 6; i++) {
+    recordAttempt(facts, 'alt', i % 2 === 0, 1000, { now: T0, startTier: 1 });
+  }
+  assert(facts['alt'].tier === 1, 'Alternating correct/miss never triggers tier move');
+}
+
+// ─── 5. 14-DAY DECAY ──────────────────────────────────────────────────────
+group('5. 14-day decay: isFluent false after 14 days, re-confirmed by one correct attempt');
+
+{
+  // Get fluent, then check 15 days later → decayed
+  const { facts } = buildFacts('3+4', allCorrect(3, 1000), { now: T0 });
+  assert(isFluent(facts, '3+4', { now: T0 }) === true,  'Fluent at T0');
+  const T15 = T0 + 15 * 86_400_000;
+  assert(isFluent(facts, '3+4', { now: T15 }) === false, 'Not fluent at T0+15d (decay)');
+}
+
+{
+  // Exactly 14 days elapsed — boundary: implementation uses strict >, so exactly
+  // 14 days is still within the window and the fact remains fluent.
+  const { facts } = buildFacts('5+2', allCorrect(3, 1000), { now: T0 });
+  const T14 = T0 + 14 * 86_400_000;
+  assert(isFluent(facts, '5+2', { now: T14 }) === true,
+    'Exactly 14 days elapsed → still fluent (decay uses strict >, not >=)');
+  // One millisecond beyond 14 days triggers decay
+  assert(isFluent(facts, '5+2', { now: T14 + 1 }) === false,
+    '14 days + 1 ms → decayed');
+}
+
+{
+  // Re-confirm: get fluent, advance 15 days, do one correct attempt, check fluent
+  const { facts } = buildFacts('6+3', allCorrect(3, 1000), { now: T0 });
+  const T15 = T0 + 15 * 86_400_000;
+  assert(isFluent(facts, '6+3', { now: T15 }) === false, 'Decayed at 15 days');
+  // One correct answer (even slow) re-confirms because s.fluent was already true
+  recordAttempt(facts, '6+3', true, 9000, { now: T15 }); // slow but correct
+  assert(isFluent(facts, '6+3', { now: T15 }) === true, 'Re-confirmed by one correct attempt');
+}
+
+{
+  // Re-confirm fails if answer is wrong
+  const { facts } = buildFacts('8-2', allCorrect(3, 1000), { now: T0 });
+  const T15 = T0 + 15 * 86_400_000;
+  recordAttempt(facts, '8-2', false, 1000, { now: T15 }); // miss
+  assert(isFluent(facts, '8-2', { now: T15 }) === false, 'Wrong answer after decay keeps not-fluent');
+}
+
+{
+  // 13 days: still within window → fluent
+  const { facts } = buildFacts('4+4', allCorrect(3, 1000), { now: T0 });
+  const T13 = T0 + 13 * 86_400_000;
+  assert(isFluent(facts, '4+4', { now: T13 }) === true, 'Still fluent at 13 days');
+}
+
+// ─── 6. pickGateFact ──────────────────────────────────────────────────────
+group('6. pickGateFact: 80/20 split and preferences');
+
+{
+  // With rand() returning 0.5 (>= 0.2), always takes arena path.
+  // Non-fluent facts preferred; among them, least-attempted first.
+  const facts = {};
+  // 'a1' has 5 attempts (non-fluent), 'a2' has 1 attempt (non-fluent), 'a3' has 3
+  for (let i = 0; i < 5; i++) recordAttempt(facts, 'a1', false, 9999, { now: T0 });
+  recordAttempt(facts, 'a2', false, 9999, { now: T0 + 1 });
+  for (let i = 0; i < 3; i++) recordAttempt(facts, 'a3', false, 9999, { now: T0 + 2 });
+
+  const arena = ['a1', 'a2', 'a3'];
+  const pick = pickGateFact(facts, arena, [], { rand: () => 0.5, now: T0 + 10 });
+  assert(pick === 'a2', 'Arena path: picks least-attempted non-fluent fact');
+}
+
+{
+  // All fluent → pick least-recently-seen
+  const facts = {};
+  // Make a1, a2, a3 all fluent via fast-pass (2 correct < threshold/2)
+  recordAttempt(facts, 'b1', true, 100, { now: T0 + 1000 });
+  recordAttempt(facts, 'b1', true, 100, { now: T0 + 2000 });
+  recordAttempt(facts, 'b2', true, 100, { now: T0 + 3000 });
+  recordAttempt(facts, 'b2', true, 100, { now: T0 + 4000 }); // b2 more recent
+  recordAttempt(facts, 'b3', true, 100, { now: T0 });         // b3 oldest
+  recordAttempt(facts, 'b3', true, 100, { now: T0 + 100 });
+
+  const arena = ['b1', 'b2', 'b3'];
+  const pick = pickGateFact(facts, arena, [], { rand: () => 0.5, now: T0 + 10000 });
+  assert(pick === 'b3', 'All fluent: picks least-recently-seen (b3 oldest)');
+}
+
+{
+  // Review path (rand < 0.2): picks oldest lastSeen from earlier pools
+  const facts = {};
+  recordAttempt(facts, 'e1', false, 9999, { now: T0 + 5000 });
+  recordAttempt(facts, 'e2', false, 9999, { now: T0 + 1000 }); // oldest
+  recordAttempt(facts, 'e3', false, 9999, { now: T0 + 3000 });
+
+  const arena  = ['cur1'];
+  const earlier = [['e1'], ['e2', 'e3']];
+  const pick = pickGateFact(facts, arena, earlier, { rand: () => 0.1, now: T0 + 9999 });
+  assert(pick === 'e2', 'Review path: picks oldest lastSeen from earlier pools');
+}
+
+{
+  // Review path: unseen earlier fact (lastSeen=0) beats any seen fact
+  const facts = {};
+  recordAttempt(facts, 'e1', false, 9999, { now: T0 + 1 }); // any lastSeen > 0
+  // e_unseen has never been recorded → lastSeen = 0 (treated as most stale)
+  const earlier = [['e1', 'e_unseen']];
+  const pick = pickGateFact(facts, [], earlier, { rand: () => 0.0, now: T0 + 9999 });
+  assert(pick === 'e_unseen', 'Review path: unseen fact (lastSeen=0) is most stale');
+}
+
+{
+  // Review path with no earlier pools → falls back to arena path
+  const facts = {};
+  recordAttempt(facts, 'c1', false, 9999, { now: T0 });
+  recordAttempt(facts, 'c2', false, 9999, { now: T0 + 1 });
+  // c1 has 1 attempt, c2 has 1 attempt — but c1 was attempted first
+  // With rand=0.0 (review intent) but no earlier pools → arena path, least-attempted
+  // Both have 1 attempt — tie → reduce picks first non-worse = 'c1' (stable first)
+  const pick = pickGateFact(facts, ['c1', 'c2'], [], { rand: () => 0.0, now: T0 + 9999 });
+  // Both have equal attempts. Reduce returns last-winning, so first one with fewer is kept.
+  // c1 attempts=1, c2 attempts=1 → neither is strictly less → first in array wins
+  assert(pick === 'c1' || pick === 'c2',
+    'No earlier pools with review roll → falls back to arena path (picks one of them)');
+}
+
+// ─── 7. arenaFluentPct ────────────────────────────────────────────────────
+group('7. arenaFluentPct: percent of pool that is fluent (decay-aware)');
+
+{
+  assert(arenaFluentPct({}, []) === 0, 'Empty pool returns 0');
+}
+
+{
+  // 2 of 4 fluent (via fast-pass)
+  const facts = {};
+  recordAttempt(facts, 'p1', true, 100, { now: T0 });
+  recordAttempt(facts, 'p1', true, 100, { now: T0 }); // fluent
+  recordAttempt(facts, 'p2', true, 100, { now: T0 });
+  recordAttempt(facts, 'p2', true, 100, { now: T0 }); // fluent
+  // p3, p4 never attempted → not fluent
+  const pool = ['p1', 'p2', 'p3', 'p4'];
+  assert(arenaFluentPct(facts, pool, { now: T0 }) === 50, '2/4 fluent = 50%');
+}
+
+{
+  // All 3 fluent
+  const facts = {};
+  ['q1','q2','q3'].forEach(id => {
+    recordAttempt(facts, id, true, 100, { now: T0 });
+    recordAttempt(facts, id, true, 100, { now: T0 }); // fast-pass
+  });
+  assert(arenaFluentPct(facts, ['q1','q2','q3'], { now: T0 }) === 100, 'All 3 fluent = 100%');
+}
+
+{
+  // Decay: was fluent but 15 days old → counts as not fluent
+  const facts = {};
+  recordAttempt(facts, 'r1', true, 100, { now: T0 });
+  recordAttempt(facts, 'r1', true, 100, { now: T0 }); // fast-pass, fluent at T0
+  recordAttempt(facts, 'r2', true, 100, { now: T0 });
+  recordAttempt(facts, 'r2', true, 100, { now: T0 }); // fast-pass, fluent at T0
+
+  const T15 = T0 + 15 * 86_400_000;
+  // At T15, both are decayed → 0%
+  assert(arenaFluentPct(facts, ['r1', 'r2'], { now: T15 }) === 0,
+    'All fluent but decayed (15d old) → 0%');
+
+  // Re-confirm r1, leave r2 decayed → 50%
+  recordAttempt(facts, 'r1', true, 9999, { now: T15 }); // correct re-confirm
+  assert(arenaFluentPct(facts, ['r1', 'r2'], { now: T15 }) === 50,
+    'After re-confirming r1: 1/2 = 50%');
+}
+
+{
+  // Custom threshold: pool of 3 facts, 3 correct but times just under custom threshold
+  const facts = {};
+  ['s1','s2','s3'].forEach(id => {
+    for (let i = 0; i < 3; i++) {
+      recordAttempt(facts, id, true, 3999, { now: T0, thresholdMs: 4000 });
+    }
+  });
+  assert(arenaFluentPct(facts, ['s1','s2','s3'], { now: T0 }) === 100,
+    'Custom 4000 ms threshold: 3 correct @ 3999 ms → all fluent → 100%');
+}
+
+// ─── 8. COUNTERS AND MISC ─────────────────────────────────────────────────
+group('8. recordAttempt: counters, lastSeen, times retention');
+
+{
+  const facts = {};
+  recordAttempt(facts, 'x1', true,  500, { now: T0 });
+  recordAttempt(facts, 'x1', false, 600, { now: T0 + 1 });
+  recordAttempt(facts, 'x1', true,  700, { now: T0 + 2 });
+  const s = facts['x1'];
+  assert(s.attempts === 3, 'attempts counter is 3');
+  assert(s.correct === 2,  'correct counter is 2');
+  assert(s.lastSeen === T0 + 2, 'lastSeen is timestamp of last attempt');
+  assert(s.last3.length === 3 && s.last3[0] === true && s.last3[1] === false && s.last3[2] === true,
+    'last3 = [true, false, true] most-recent last');
+  // times only records correct answers
+  assert(s.times.length === 2 && s.times[0] === 500 && s.times[1] === 700,
+    'times contains only correct attempt ms (500, 700)');
+}
+
+{
+  // times capped at 5 entries
+  const facts = {};
+  for (let i = 1; i <= 7; i++) {
+    recordAttempt(facts, 'cap', true, i * 100, { now: T0 + i });
+  }
+  assert(facts['cap'].times.length === 5, 'times capped at 5 entries');
+  assert(facts['cap'].times[0] === 300, 'oldest excess entries dropped (first kept = 3rd attempt)');
+}
+
+{
+  // last3 capped at 3 entries
+  const facts = {};
+  for (let i = 0; i < 5; i++) {
+    recordAttempt(facts, 'l3', i % 2 === 0, 1000, { now: T0 + i });
+  }
+  assert(facts['l3'].last3.length === 3, 'last3 capped at 3');
+}
+
+// ─── SUMMARY ──────────────────────────────────────────────────────────────
+const summary = document.createElement('div');
+summary.id = 'summary';
+const total = passed + failed;
+summary.className = failed === 0 ? 'pass' : 'fail';
+summary.textContent = failed === 0
+  ? `PASS — all ${total} tests passed`
+  : `FAIL — ${failed} of ${total} tests failed`;
+document.body.appendChild(summary);
+</script>
+</body>
+</html>
