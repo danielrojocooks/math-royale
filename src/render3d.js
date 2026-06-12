@@ -76,11 +76,12 @@ function resize() {
   // instead of a tiny field floating in blank green margins.
   const vF = Math.tan((cam.fov / 2) * Math.PI / 180);
   const fitW = 9.5 / (vF * cam.aspect) * 0.66;     // field half-width ~9.0 + margin
-  const fitD = 10.0 / vF * 0.66;                   // field half-depth ~9.3 (tilt-foreshortened)
+  const fitD = 10.8 / vF * 0.66;                   // full depth incl BOTH castles
   const dist = Math.max(9.0, fitW, fitD);
-  // slightly oblique CR tilt, field shifted up so the HUD doesn't cover the castle
+  // slightly oblique CR tilt, centered so both castles are on screen
+  // (landscape HUD docks right, so the bottom of the screen is usable field)
   cam.position.set(0.9, dist * 0.9, dist * 0.98);
-  cam.lookAt(0, 0, -1.6);
+  cam.lookAt(0, 0, -1.0);
   cam.updateProjectionMatrix();
 }
 
@@ -142,7 +143,11 @@ async function loadAssets() {
 
 function place(model, x, z, s, ry) {
   const o = SkeletonUtils.clone(model);
-  o.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+  // Clone materials per instance — otherwise one tower's hit-flash emissive
+  // tints every copy of the model on the field.
+  o.traverse(n => {
+    if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; n.material = n.material.clone(); }
+  });
   o.scale.setScalar(s); o.position.set(x, 0, z); o.rotation.y = ry || 0;
   scene.add(o); return o;
 }
@@ -187,6 +192,13 @@ function decorate() {
   for (const fx of [-5.6, -4.2, 4.2, 5.6]) {
     put('fence_wood_straight', fx, bz(RIVER_T) - 0.5, 0.55);
     put('fence_wood_straight', fx, bz(RIVER_B) + 0.5, 0.55);
+  }
+  // dress the empty strip between the lanes (skip the river crossing)
+  for (let i = 0; i < 8; i++) {
+    const z = -7 + i * 2.0 + rng(i, 12) * 0.8;
+    if (Math.abs(z + 0.2) < 1.6) continue;                 // river zone
+    const m = F[Math.floor(rng(i, 13) * 8)];               // trees/bushes/rocks only
+    place(m, (rng(i, 14) - 0.5) * 1.6, z, 0.26 + rng(i, 15) * 0.14, rng(i, 16) * 6.28);
   }
 }
 

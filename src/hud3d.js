@@ -44,6 +44,20 @@ function injectStyles() {
 #hud .card.dim { opacity: .4; }
 #hud .card.sel { transform: translateY(-8px); border-color: #2b7de0;
   box-shadow: 0 0 14px rgba(43,125,224,.7); }
+/* LANDSCAPE: dock the HUD as a right-edge column so the field gets the full
+   height (player castle was hiding under the bottom bar). */
+@media (orientation: landscape) {
+  #hud { left: auto; right: 0; top: 0; bottom: 0; width: 102px;
+    border-top: none; border-left: 3px solid rgba(255, 207, 77, .8);
+    padding: 8px 6px; display: flex; flex-direction: column; gap: 8px; }
+  #hud .elix-row { flex-direction: column; gap: 4px; margin-bottom: 0; }
+  #hud .elix-label { display: none; }
+  #hud .elix-bar { flex-wrap: wrap; gap: 2px; width: 100%; }
+  #hud .elix-cell { flex: 0 0 30%; height: 9px; }
+  #hud .cards { flex-direction: column; gap: 10px; flex: 1; justify-content: flex-start; }
+  #hud .card { max-width: none; width: 100%; }
+  #hud .card.sel { transform: translateX(-8px); }
+}
 .hud-pop { position: fixed; z-index: 45; pointer-events: none;
   font-family: "Trebuchet MS","Segoe UI",sans-serif; font-weight: 900;
   text-shadow: 0 2px 4px rgba(0,0,0,.8); transform: translate(-50%, -50%); }

@@ -155,6 +155,21 @@ export function update(dt) {
     if (t.hit > 0) t.hit -= dt;
     if (t.dead) { t.dying -= dt; continue; }
     if (t.pop < 1) t.pop = Math.min(1, t.pop + dt * 5);
+    // Target acquisition: chase the nearest living enemy in this lane (EITHER
+    // direction) — so defenders turn around for invaders that slipped past —
+    // and only march on towers when no enemy is near.
+    let foe = null, fd = 1e9;
+    for (const o of S.troops) {
+      if (o.dead || o.side === t.side || o.lane !== t.lane) continue;
+      const d = Math.abs(o.y - t.y);
+      if (d < fd) { fd = d; foe = o; }
+    }
+    if (foe && fd < 260 && fd > 42) {
+      const chaseDir = Math.sign(foe.y - t.y);
+      t.y += chaseDir * SPEED * dt; t.moving = true; t.walk += dt * 8; t.atk = 0; t.atkcd = .25;
+      t.dust -= dt; if (t.dust <= 0) { dust(t.x, t.y + (46 + t.maxval * 10) * 0.46); t.dust = .3; }
+      continue;                                  // combat pass resolves on contact
+    }
     const tw = oppTower(t.side, t.lane);
     if (!tw) continue;
     const dir = t.side === 'you' ? -1 : 1, stopY = tw.y - dir * 60;

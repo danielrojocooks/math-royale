@@ -7,7 +7,7 @@ export const W = 760, H = 1180;
 // Board geometry
 export const LANE = [215, 545];          // x centers of the two lanes
 export const RIVER_T = 500, RIVER_B = 560;
-export const DEPLOY_MIN = 580, DEPLOY_MAX = 858;  // where the player may drop troops
+export const DEPLOY_MIN = 580, DEPLOY_MAX = 890;  // where the player may drop troops (down to the king)
 export const PANEL_Y = 970;              // top of the card/elixir panel
 export const SPEED = 52;                 // troop march speed (px/s)
 
