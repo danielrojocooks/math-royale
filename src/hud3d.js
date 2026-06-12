@@ -56,9 +56,12 @@ function injectStyles() {
   #hud .elix-bar { flex-wrap: wrap; gap: 2px; width: 100%; }
   #hud .elix-cell { flex: 0 0 28%; height: 7px; }
   #hud .cards { flex-direction: column; gap: 8px; flex: none; justify-content: flex-start; }
-  /* flex:0 — in a column, flex:1 stretches each card tall and the square
-     aspect-ratio balloons it sideways (the only-2-cards-visible bug) */
-  #hud .card { flex: 0 0 auto; max-width: none; width: 100%; }
+  /* Explicit fixed height: aspect-ratio + percentage-height imgs misbehave in a
+     flex column (sprites overflowed the card boxes at natural size) */
+  #hud .card { flex: 0 0 62px; height: 62px; aspect-ratio: auto; max-width: none; width: 100%;
+    overflow: hidden; border-radius: 10px; }
+  #hud .card img { height: 100%; width: 100%; object-fit: contain; }
+  #hud .card .cost { z-index: 1; }
   #hud .card .cost { width: 20px; height: 20px; font-size: 11px; top: -5px; left: -5px; }
   #hud .card.sel { transform: translateX(-7px); }
 }
