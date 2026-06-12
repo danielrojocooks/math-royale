@@ -47,16 +47,20 @@ function injectStyles() {
 /* LANDSCAPE: dock the HUD as a right-edge column so the field gets the full
    height (player castle was hiding under the bottom bar). */
 @media (orientation: landscape) {
-  #hud { left: auto; right: 0; top: 0; bottom: 0; width: 102px;
+  #hud { left: auto; right: 0; top: 0; bottom: 0; width: 76px;
     border-top: none; border-left: 3px solid rgba(255, 207, 77, .8);
-    padding: 8px 6px; display: flex; flex-direction: column; gap: 8px; }
-  #hud .elix-row { flex-direction: column; gap: 4px; margin-bottom: 0; }
+    padding: 6px 5px; display: flex; flex-direction: column; gap: 6px; }
+  #hud .elix-row { flex-direction: column; gap: 3px; margin-bottom: 0; }
   #hud .elix-label { display: none; }
+  #hud .elix-num { width: 24px; height: 24px; font-size: 13px; }
   #hud .elix-bar { flex-wrap: wrap; gap: 2px; width: 100%; }
-  #hud .elix-cell { flex: 0 0 30%; height: 9px; }
-  #hud .cards { flex-direction: column; gap: 10px; flex: 1; justify-content: flex-start; }
-  #hud .card { max-width: none; width: 100%; }
-  #hud .card.sel { transform: translateX(-8px); }
+  #hud .elix-cell { flex: 0 0 28%; height: 7px; }
+  #hud .cards { flex-direction: column; gap: 8px; flex: none; justify-content: flex-start; }
+  /* flex:0 — in a column, flex:1 stretches each card tall and the square
+     aspect-ratio balloons it sideways (the only-2-cards-visible bug) */
+  #hud .card { flex: 0 0 auto; max-width: none; width: 100%; }
+  #hud .card .cost { width: 20px; height: 20px; font-size: 11px; top: -5px; left: -5px; }
+  #hud .card.sel { transform: translateX(-7px); }
 }
 .hud-pop { position: fixed; z-index: 45; pointer-events: none;
   font-family: "Trebuchet MS","Segoe UI",sans-serif; font-weight: 900;
