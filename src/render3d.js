@@ -32,7 +32,9 @@ const MODEL3D = {
   unit_17: { glb: 'Skeleton_Mage',    atk: 'Melee_2H_Attack_Spin', r: 'staff_B' },                       // 5
   unit_16: { glb: 'Skeleton_Rogue',   atk: 'Melee_Dualwield_Attack_Slice', r: 'dagger_A', l: 'dagger_A' },// 6
   unit_13: { glb: 'Skeleton_Mage',    atk: 'Melee_2H_Attack_Spin', r: 'staff_A' },                       // 7
-  unit_14: { glb: 'Skeleton_Warrior', atk: 'Melee_2H_Attack_Chop', r: 'sword_B', l: 'shield_B' },        // 8
+  unit_14:    { glb: 'Skeleton_Warrior', atk: 'Melee_2H_Attack_Chop', r: 'sword_B', l: 'shield_B' },        // 8
+  unit_rogue: { glb: 'Rogue', atk: 'Melee_Dualwield_Attack_Stab', r: 'dagger_A', l: 'dagger_B' },
+  unit_04:    { glb: 'Mage',  atk: 'Melee_2H_Attack_Spin', r: 'staff_B' },
 };
 const WEAPONS = ['sword_A', 'sword_B', 'shield_A', 'shield_B', 'bow_A_withString',
   'axe_A', 'staff_A', 'staff_B', 'dagger_A', 'dagger_B'];
@@ -238,9 +240,10 @@ function decorate() {
   const rng = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5; return s - Math.floor(s); };
   // bridges over the river at each lane
   for (const lx of LANE) place(e.bridge, bx(lx), bz(530), 1.5, Math.PI / 2);
-  // builder-pack landmarks in the side meadows
-  place(e.forest, -7.6, 3.5, 1.3); place(e.hill, 7.9, -6.5, 1.3);
-  place(e.rocks, -7.2, -7.5, 1.2); place(e.forest, 8.1, 2.5, 1.2);
+  // builder-pack landmarks in the side meadows (kept well clear of the lanes —
+  // perspective lets near-lane trees occlude units)
+  place(e.forest, -9.0, 3.5, 1.3); place(e.hill, 8.8, -6.5, 1.3);
+  place(e.rocks, -8.4, -7.5, 1.2); place(e.forest, 9.2, 2.5, 1.2);
   // theme-aware scatter: which models populate the world depends on the arena
   // F indexes: 0-3 trees, 4-5 bushes, 6-7 rocks, 8-9 grass, 10-11 bare trees
   const F = assets.forest;
@@ -256,7 +259,7 @@ function decorate() {
     const side = i % 2 === 0 ? -1 : 1;
     let x, z;
     const bandCut = Math.floor(fl.n * 0.66);
-    if (i < bandCut) { x = side * (6.4 + rng(i, 1) * 7.5); z = -12 + (i / bandCut) * 24 + rng(i, 2) * 1.6; }
+    if (i < bandCut) { x = side * (7.8 + rng(i, 1) * 6.5); z = -12 + (i / bandCut) * 24 + rng(i, 2) * 1.6; }
     else { x = -13 + rng(i, 3) * 26; z = (i % 2 ? -12.5 : 11.6) + rng(i, 4) * 1.6; }
     const model = F[fl.models[Math.floor(rng(i, 5) * fl.models.length)]];
     // forest-pack models are authored much larger than builder-pack buildings
