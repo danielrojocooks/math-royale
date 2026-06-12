@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Royale 3D — Knight vs Skeleton</title>
+<style>
+  html,body{margin:0;height:100%;background:#1a1230;overflow:hidden;font-family:"Trebuchet MS","Segoe UI",sans-serif;}
+  #ui{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:14px;z-index:10;flex-wrap:wrap;}
+  button{font:900 18px "Trebuchet MS";padding:12px 22px;border-radius:14px;border:4px solid #fff;
+         background:#e2521b;color:#fff;box-shadow:0 5px 0 rgba(0,0,0,.4);cursor:pointer;}
+  button:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.4);}
+  button.b{background:#2b7de0;} button.g{background:#22c24a;} button.p{background:#c026a8;}
+  #msg{position:fixed;top:12px;left:0;right:0;text-align:center;color:#fff;font-weight:900;z-index:10;
+       text-shadow:1px 1px 0 #000;font-size:15px;}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="msg">loading the cast…</div>
+<div id="ui">
+  <button class="g" onclick="knightPlay('Walking_A',true)">WALK</button>
+  <button class="b" onclick="knightPlay('Running_A',true)">RUN</button>
+  <button onclick="knightPlay('Melee_2H_Attack_Spin')">ATTACK</button>
+  <button class="p" onclick="fight()">⚔ FIGHT!</button>
+  <button class="g" onclick="knightPlay('Spawn_Ground')">DEPLOY</button>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const ADV='assets/kaykit/adventurers/KayKit_Adventurers_2.0_FREE/Characters/gltf/';
+const SKL='assets/kaykit/skeletons/KayKit_Skeletons_1.1_FREE/characters/gltf/';
+const ANIM='assets/kaykit/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/';
+const BLD='assets/kaykit/builder/Models/objects/gltf/';
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8fd0ff);
+scene.fog=new THREE.Fog(0x8fd0ff,28,70);
+const cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,200);
+cam.position.set(0,9,12);
+const ren=new THREE.WebGLRenderer({antialias:true});
+ren.setSize(innerWidth,innerHeight);ren.setPixelRatio(Math.min(devicePixelRatio,2));
+ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(ren.domElement);
+const ctl=new OrbitControls(cam,ren.domElement);ctl.target.set(0,1,0);ctl.maxPolarAngle=1.45;ctl.update();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);});
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x668844,1.1));
+const sun=new THREE.DirectionalLight(0xffffff,2.2);
+sun.position.set(8,14,6);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;
+sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;
+scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(90,90),new THREE.MeshLambertMaterial({color:0x6db33a}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+const loader=new GLTFLoader();
+const msg=document.getElementById('msg');
+const load=u=>new Promise((res,rej)=>loader.load(u,res,undefined,rej));
+
+function badge(text,color){
+  const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');
+  x.beginPath();x.arc(64,64,54,0,6.28);x.fillStyle=color;x.fill();
+  x.lineWidth=10;x.strokeStyle='#fff';x.stroke();
+  x.fillStyle='#fff';x.font='900 64px Trebuchet MS';x.textAlign='center';x.textBaseline='middle';x.fillText(text,64,68);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  s.scale.setScalar(0.85);s.position.y=2.45;s.renderOrder=99;return s;
+}
+function shadowify(o){o.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});return o;}
+
+let kn,sk,mixK,mixS,actsK={},actsS={},curK=null,curS=null,busy=false;
+function playOn(acts,mix,curRef,name,loop){
+  const a=acts[name];if(!a)return curRef;
+  if(curRef&&curRef!==a)curRef.fadeOut(0.18);
+  a.reset();a.setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce);a.clampWhenFinished=!loop;
+  a.fadeIn(0.18).play();return a;
+}
+window.knightPlay=(n,loop)=>{if(busy)return;curK=playOn(actsK,mixK,curK,n,loop);
+  if(!loop){mixK.removeEventListener('finished',window._kf);
+    window._kf=()=>{curK=playOn(actsK,mixK,curK,'Idle_A',true);};mixK.addEventListener('finished',window._kf);}};
+
+try{
+  const [kg,sg,mov,gen,mel]=await Promise.all([
+    load(ADV+'Knight.glb'),load(SKL+'Skeleton_Warrior.glb'),
+    load(ANIM+'Rig_Medium_MovementBasic.glb'),load(ANIM+'Rig_Medium_General.glb'),load(ANIM+'Rig_Medium_CombatMelee.glb'),
+  ]);
+  const clips=[...mov.animations,...gen.animations,...mel.animations,...kg.animations,...sg.animations];
+
+  kn=shadowify(kg.scene);kn.position.set(-1.6,0,1.5);kn.rotation.y=Math.PI/2.6;scene.add(kn);
+  sk=shadowify(sg.scene);sk.position.set(1.8,0,-1.2);sk.rotation.y=-Math.PI/1.8;scene.add(sk);
+  kn.add(badge('5','#2b7de0'));sk.add(badge('3','#e23b3b'));
+
+  mixK=new THREE.AnimationMixer(kn);mixS=new THREE.AnimationMixer(sk);
+  for(const c of clips){if(!actsK[c.name])actsK[c.name]=mixK.clipAction(c);if(!actsS[c.name])actsS[c.name]=mixS.clipAction(c);}
+  curK=playOn(actsK,mixK,curK,'Idle_A',true);
+  curS=playOn(actsS,mixS,curS,'Idle_A',true);
+
+  // medieval builder environment
+  async function put(n,x,z,s,ry){const g=await load(BLD+n+'.gltf.glb');const o=shadowify(g.scene);
+    o.scale.setScalar(s||1);o.position.set(x,0,z);o.rotation.y=ry||0;scene.add(o);return o;}
+  await put('castle',0,9.5,1.6,Math.PI);
+  await put('watchtower',-7,-6,1.4,0.5);
+  await put('watchtower',7,-6,1.4,-0.5);
+  await put('bridge',6.5,3,1.2,1.1);
+  await put('detail_treeA',-6,2,1.5);await put('detail_treeB',-7.5,4,1.5);
+  await put('detail_forestA',9,-1,1.4);await put('detail_rocks',-4,-4,1.3);
+  await put('detail_hill',10,6,1.5);
+
+  msg.textContent='Knight vs Skeleton — real characters, real skeletal animation. Hit FIGHT!';
+}catch(e){msg.textContent='load error: '+e.message;console.error(e);}
+
+// ---- FIGHT sequence: run in, spin-slash, skeleton dies, respawn, walk back ----
+window.fight=async()=>{
+  if(busy||!kn)return;busy=true;
+  const home=kn.position.clone(), tgt=sk.position.clone();
+  const dir=tgt.clone().sub(home);dir.y=0;const dist=dir.length();dir.normalize();
+  kn.rotation.y=Math.atan2(dir.x,dir.z);
+  curK=playOn(actsK,mixK,curK,'Running_A',true);
+  await tween(t=>{kn.position.lerpVectors(home,tgt.clone().sub(dir.clone().multiplyScalar(1.5)),t);},Math.max(.3,dist/6));
+  curK=playOn(actsK,mixK,curK,'Melee_2H_Attack_Spin',false);
+  setTimeout(()=>{curS=playOn(actsS,mixS,curS,'Death_A',false);},450);
+  await wait(1.3);
+  curK=playOn(actsK,mixK,curK,'Walking_A',true);
+  kn.rotation.y=Math.atan2(-dir.x,-dir.z);
+  await tween(t=>{kn.position.lerpVectors(tgt.clone().sub(dir.clone().multiplyScalar(1.5)),home,t);},dist/2.5);
+  kn.rotation.y=Math.PI/2.6;
+  curK=playOn(actsK,mixK,curK,'Idle_A',true);
+  await wait(.6);
+  curS=playOn(actsS,mixS,curS,'Spawn_Ground',false);
+  await wait(.9);
+  curS=playOn(actsS,mixS,curS,'Idle_A',true);
+  busy=false;
+};
+const wait=s=>new Promise(r=>setTimeout(r,s*1000));
+function tween(fn,secs){return new Promise(r=>{const t0=performance.now();
+  (function step(){const t=Math.min(1,(performance.now()-t0)/1000/secs);fn(t);
+    if(t<1)requestAnimationFrame(step);else r();})();});}
+
+const clock=new THREE.Clock();
+(function frame(){requestAnimationFrame(frame);const dt=clock.getDelta();
+  if(mixK)mixK.update(dt);if(mixS)mixS.update(dt);ren.render(scene,cam);})();
+</script>
+</body>
+</html>

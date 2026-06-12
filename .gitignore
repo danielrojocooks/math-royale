@@ -1,0 +1,11 @@
+# Raw art packs stay local (hundreds of MB, multiple formats).
+# Curated game-ready models get copied into assets/game/ (E10).
+assets/kaykit/
+assets/kenney/
+assets/toon/
+assets/fantasy/
+assets/fantasy_t/*.png
+
+# OS noise
+Thumbs.db
+desktop.ini

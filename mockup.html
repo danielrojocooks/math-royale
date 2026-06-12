@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Math Royale — art mockup v3</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
+  html,body { height:100%; background:#0e0a1c; font-family:"Trebuchet MS","Segoe UI",sans-serif; overflow:hidden; }
+  .stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .board { position:relative; width:760px; height:1180px; transform-origin:center; border-radius:26px; overflow:hidden;
+           box-shadow:0 30px 80px rgba(0,0,0,.7); background:#6db33a; }
+  svg.field { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+
+  /* ---------- towers (3 per side, CR layout) ---------- */
+  .tower { position:absolute; z-index:8; text-align:center; transform:translateX(-50%); }
+  .tower .art { line-height:1; filter:drop-shadow(0 7px 5px rgba(0,0,0,.4)); display:block; }
+  .tower .hpbar { margin:1px auto 0; height:14px; border-radius:8px; border:3px solid #fff; overflow:hidden; box-shadow:0 2px 0 rgba(0,0,0,.3); }
+  .tower .hpbar i { display:block; height:100%; }
+  .tower .hptxt { font-weight:900; color:#fff; font-size:14px; text-shadow:1px 1px 0 #000; line-height:1.3; }
+  .foeT .hpbar i { background:linear-gradient(#ff8a8a,#e23b3b); }
+  .youT .hpbar i { background:linear-gradient(#7dff8a,#22c24a); }
+  .king .art { font-size:96px; } .princess .art { font-size:64px; }
+  .king .hpbar { width:150px; } .princess .hpbar { width:104px; }
+
+  /* ---------- troops: creature first, small number badge ---------- */
+  .mob { position:absolute; z-index:7; text-align:center; transform:translateX(-50%); animation:bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-7px)} }
+  .mob .art { line-height:1; filter:drop-shadow(0 6px 5px rgba(0,0,0,.35)); display:block; }
+  .mob .num { position:absolute; bottom:-6px; right:-12px; min-width:30px; height:30px; padding:0 4px; border-radius:50%;
+              border:3px solid #fff; color:#fff; font-size:18px; font-weight:900; display:flex; align-items:center; justify-content:center;
+              box-shadow:0 3px 0 rgba(0,0,0,.3); text-shadow:1px 1px 0 #000; }
+  .mine .num { background:#2b7de0; } .foe .num { background:#e23b3b; }
+  .ring { position:absolute; left:50%; bottom:-4px; transform:translateX(-50%); width:70%; height:13px; border-radius:50%; z-index:-1; filter:blur(1px); }
+  .mine .ring { background:rgba(43,125,224,.45); } .foe .ring { background:rgba(226,59,59,.45); }
+
+  /* ---------- bottom tray: CR-style elixir + cards ---------- */
+  .tray { position:absolute; left:0; right:0; bottom:0; height:210px; z-index:20;
+          background:linear-gradient(#3a2566,#241043); border-top:6px solid #ffcf4d; padding:12px 16px; }
+  .elixRow { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .elixNum { width:40px; height:40px; border-radius:50%; background:#c026a8; border:4px solid #fff; color:#fff;
+             font-size:24px; font-weight:900; display:flex; align-items:center; justify-content:center; text-shadow:1px 1px 0 #000; }
+  .elix { flex:1; display:flex; gap:4px; }
+  .cell { flex:1; height:24px; border-radius:7px; background:#2a1a4d; border:2px solid #5b3fa0; }
+  .cell.on { background:linear-gradient(#ff5fae,#c026a8); border-color:#ff9bd8; box-shadow:inset 0 2px 2px rgba(255,255,255,.4); }
+
+  .cards { display:flex; gap:12px; justify-content:center; }
+  .card { width:140px; height:118px; border-radius:16px; position:relative;
+          background:linear-gradient(#fff4d6,#ffd98a); border:5px solid #ffcf4d;
+          box-shadow:0 6px 0 #b9842a, 0 9px 14px rgba(0,0,0,.4);
+          display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .card.locked { filter:grayscale(.7) brightness(.8); }
+  .card.locked::after { content:"need 8"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+          background:rgba(20,8,40,.55); color:#fff; font-weight:900; font-size:15px; border-radius:11px; }
+  .card .cart { font-size:58px; line-height:1; filter:drop-shadow(0 4px 3px rgba(0,0,0,.25)); }
+  .card .cname { position:absolute; top:5px; left:0; right:0; font-size:12px; font-weight:900; color:#7a4b12; letter-spacing:.4px; }
+  .card .cost { position:absolute; top:-8px; left:-8px; width:34px; height:34px; border-radius:50%; background:#c026a8;
+                border:3px solid #fff; color:#fff; font-size:18px; font-weight:900; display:flex; align-items:center; justify-content:center; text-shadow:1px 1px 0 #000; }
+  .card .speed { position:absolute; bottom:5px; font-size:11px; font-weight:900; color:#7a4b12; }
+
+  .hud { position:absolute; top:14px; right:14px; z-index:25; background:#5b2da8; color:#fff; border:4px solid #fff;
+         border-radius:16px; padding:5px 14px; font-weight:900; font-size:17px; box-shadow:0 4px 0 rgba(0,0,0,.3); }
+  .wm { position:absolute; top:14px; left:14px; z-index:25; color:#fff; font-weight:900; font-size:12px; opacity:.55; max-width:210px; }
+</style>
+</head>
+<body>
+<div class="stage"><div class="board" id="board">
+
+  <svg class="field" viewBox="0 0 760 1180" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9ad36a"/><stop offset="1" stop-color="#5fa233"/></linearGradient>
+      <linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fd0ff"/><stop offset="1" stop-color="#2b95d6"/></linearGradient>
+    </defs>
+    <rect x="0" y="0" width="760" height="1180" fill="url(#grass)"/>
+    <!-- two lanes -->
+    <polygon points="70,975 350,975 358,200 300,200" fill="#86c457" opacity=".5"/>
+    <polygon points="410,975 690,975 460,200 402,200" fill="#86c457" opacity=".5"/>
+    <!-- river + two bridges -->
+    <polygon points="40,548 720,548 695,606 65,606" fill="url(#water)"/>
+    <polygon points="135,544 300,544 305,610 128,610" fill="#b07b46"/>
+    <polygon points="460,544 625,544 632,610 455,610" fill="#b07b46"/>
+  </svg>
+
+  <div class="wm">art mockup v3 — emoji stand in for real art</div>
+  <div class="hud">⏱ 2:30</div>
+
+  <!-- ENEMY towers (top) -->
+  <div class="tower foeT princess" style="left:215px; top:235px;"><span class="art">🏯</span><div class="hpbar"><i style="width:100%"></i></div><div class="hptxt">30</div></div>
+  <div class="tower foeT princess" style="left:545px; top:235px;"><span class="art">🏯</span><div class="hpbar"><i style="width:60%"></i></div><div class="hptxt">18</div></div>
+  <div class="tower foeT king" style="left:380px; top:80px;"><span class="art">🏯</span><div class="hpbar"><i style="width:100%"></i></div><div class="hptxt">ENEMY KING 100</div></div>
+
+  <!-- YOUR towers (bottom) -->
+  <div class="tower youT princess" style="left:215px; top:700px;"><span class="art">🏰</span><div class="hpbar"><i style="width:80%"></i></div><div class="hptxt">24</div></div>
+  <div class="tower youT princess" style="left:545px; top:700px;"><span class="art">🏰</span><div class="hpbar"><i style="width:100%"></i></div><div class="hptxt">30</div></div>
+  <div class="tower youT king" style="left:380px; top:870px;"><span class="art">🏰</span><div class="hpbar"><i style="width:84%"></i></div><div class="hptxt">YOUR KING 84</div></div>
+
+  <!-- ======= TROOPS ======= -->
+  <!-- enemy dragon down the right lane -->
+  <div class="mob foe" style="left:520px; top:330px;"><span class="art" style="font-size:64px;">🐉</span><span class="num">30</span><span class="ring"></span></div>
+  <!-- left-bridge clash: your archer(5) vs enemy skeleton(3) -->
+  <div class="mob foe" style="left:200px; top:490px;"><span class="art" style="font-size:56px;">💀</span><span class="num">3</span><span class="ring"></span></div>
+  <div class="mob mine" style="left:225px; top:600px;"><span class="art" style="font-size:70px;">🏹</span><span class="num">5</span><span class="ring"></span></div>
+  <!-- your skeleton swarm pushing left lane -->
+  <div class="mob mine" style="left:165px; top:760px;"><span class="art" style="font-size:74px;">💀</span><span class="num">2</span><span class="ring"></span></div>
+  <div class="mob mine" style="left:270px; top:810px;"><span class="art" style="font-size:80px;">💀</span><span class="num">2</span><span class="ring"></span></div>
+  <!-- enemy ogre pushing your right lane -->
+  <div class="mob foe" style="left:545px; top:640px;"><span class="art" style="font-size:88px;">👹</span><span class="num">8</span><span class="ring"></span></div>
+
+  <!-- ======= ELIXIR + HAND ======= -->
+  <div class="tray">
+    <div class="elixRow">
+      <span class="elixNum">6</span>
+      <div class="elix">
+        <div class="cell on"></div><div class="cell on"></div><div class="cell on"></div>
+        <div class="cell on"></div><div class="cell on"></div><div class="cell on"></div>
+        <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card"><span class="cost">2</span><span class="cname">SKELETON</span><span class="cart">💀</span><span class="speed">fast • cheap</span></div>
+      <div class="card"><span class="cost">4</span><span class="cname">KNIGHT</span><span class="cart">⚔️</span><span class="speed">medium</span></div>
+      <div class="card"><span class="cost">5</span><span class="cname">ARCHER</span><span class="cart">🏹</span><span class="speed">medium</span></div>
+      <div class="card locked"><span class="cost">8</span><span class="cname">OGRE</span><span class="cart">👹</span><span class="speed">slow • heavy</span></div>
+    </div>
+  </div>
+
+</div></div>
+<script>
+  function fit(){ const b=document.getElementById('board');
+    b.style.transform='scale('+Math.min(window.innerWidth/760, window.innerHeight/1180)+')'; }
+  window.addEventListener('resize',fit); fit();
+</script>
+</body>
+</html>
