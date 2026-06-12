@@ -1,5 +1,5 @@
 // Pointer input: hit-tests the card panel, deploys troops. No game rules here.
-import { toWorld, cardRect } from './render2d.js';
+import { toWorld, cardRect } from './render3d.js';
 import { DECK } from '../data/units.js';
 import * as battle from './battle.js';
 

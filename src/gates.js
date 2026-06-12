@@ -14,7 +14,7 @@
 // Build-exact-N lives on in catapult-puzzle.html -> Training Grounds (E8).
 
 import { S, repairTower, addElixir } from './battle.js';
-import { worldToScreen } from './render2d.js';
+import { worldToScreen } from './render3d.js';
 import { pickGateFact, scaffoldTier, recordAttempt } from './mastery.js';
 import { loadProfile, saveProfile, getActiveProfileId } from './store.js';
 

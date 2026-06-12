@@ -12,7 +12,8 @@
 // handler we call e.stopImmediatePropagation() so input.js never sees the tap,
 // then we navigate to arena select ourselves.
 
-import { initRender, render } from './render2d.js';
+import { initRender, render } from './render3d.js';
+import { initHud, updateHud } from './hud3d.js';
 import { initInput } from './input.js';
 import * as battle from './battle.js';
 import { showProfilePicker } from './profiles-ui.js';
@@ -79,6 +80,7 @@ function startMatch(profile, arenaId, isBoss) {
   // 3. Reset + init.
   battle.reset();
   initGates();
+  initHud();
 
   // 4. Cancel any previous loop; clear stale intercept.
   if (_rafId !== null) cancelAnimationFrame(_rafId);
@@ -93,6 +95,7 @@ function startMatch(profile, arenaId, isBoss) {
     battle.update(dt);
     render(battle.S);
     updateGates();
+    updateHud(battle.S);
 
     // Detect match end; arm the intercept listener exactly once.
     if (battle.S.over && !_matchEndHandled) {
