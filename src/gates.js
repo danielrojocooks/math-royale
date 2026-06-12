@@ -46,7 +46,8 @@ function injectStyles() {
   s.textContent = `
 #gate-card {
   position: fixed; z-index: 60;
-  left: 26px; top: 55%;              /* left edge (fully on-screen), lower half — over the empty meadow */
+  left: 50%; top: 12px;              /* top center — prominent, can't be missed */
+  transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
   border: 3px solid rgba(255,207,77,.75);
@@ -60,10 +61,15 @@ function injectStyles() {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   user-select: none; -webkit-user-select: none;
-  animation: gate-drop-in .3s cubic-bezier(.2,1.4,.6,1);
+  animation: gate-drop-in .3s cubic-bezier(.2,1.4,.6,1),
+             gate-breathe 1.6s ease-in-out .4s infinite;  /* gentle pulse — draws the eye */
 }
-@keyframes gate-drop-in { from { transform: translateY(-30px) scale(.6); opacity: 0; }
-                          to   { transform: translateY(0) scale(1);  opacity: 1; } }
+@keyframes gate-breathe {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50%      { transform: translateX(-50%) scale(1.06); }
+}
+@keyframes gate-drop-in { from { transform: translateX(-50%) translateY(-40px) scale(.6); opacity: 0; }
+                          to   { transform: translateX(-50%) translateY(0) scale(1);  opacity: 1; } }
 #gate-card .eq {
   font-size: clamp(19px, 4vw, 27px);
   font-weight: 900; color: #5a3a10;
@@ -103,14 +109,14 @@ function injectStyles() {
 #gate-card .ans button.right { border-color: #22c24a; background: #143d1a; }
 #gate-card.wobble { animation: gate-wobble .4s ease; }
 @keyframes gate-wobble {
-  0%,100% { transform: rotate(0); }
-  25% { transform: translateX(-6px) rotate(-4deg); }
-  75% { transform: translateX(6px) rotate(4deg); }
+  0%,100% { transform: translateX(-50%) rotate(0); }
+  25% { transform: translateX(calc(-50% - 7px)) rotate(-4deg); }
+  75% { transform: translateX(calc(-50% + 7px)) rotate(4deg); }
 }
 #gate-card.solved { animation: gate-solved .5s ease forwards; pointer-events: none; }
 @keyframes gate-solved {
-  30% { transform: scale(1.15); }
-  100% { transform: translateY(-50px) scale(.4); opacity: 0; }
+  30% { transform: translateX(-50%) scale(1.15); }
+  100% { transform: translateX(-50%) translateY(-60px) scale(.4); opacity: 0; }
 }
 .gate-confetti { position: fixed; width: 9px; height: 9px; z-index: 61;
   pointer-events: none; border-radius: 2px; animation: gate-conf .7s ease-out forwards; }
