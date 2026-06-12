@@ -178,14 +178,16 @@ export async function getPortraits() {
   pc.position.set(0, 1.5, 3.3); pc.lookAt(0, 1.0, 0);
   portraitCache = {};
   for (const [spr, def] of Object.entries(MODEL3D)) {
-    const obj = buildCharacter(def);
-    obj.rotation.y = 0.5;                                // 3/4 face view
-    const mx = new THREE.AnimationMixer(obj);            // pose out of T-pose
-    if (assets.clips['Idle_A']) { mx.clipAction(assets.clips['Idle_A']).play(); mx.update(0.4); }
-    sc.add(obj);
-    r.render(sc, pc);
-    portraitCache[spr] = r.domElement.toDataURL('image/png');
-    sc.remove(obj);
+    try {                                                // one bad render must not poison the batch
+      const obj = buildCharacter(def);
+      obj.rotation.y = 0.5;                              // 3/4 face view
+      const mx = new THREE.AnimationMixer(obj);          // pose out of T-pose
+      if (assets.clips['Idle_A']) { mx.clipAction(assets.clips['Idle_A']).play(); mx.update(0.4); }
+      sc.add(obj);
+      r.render(sc, pc);
+      portraitCache[spr] = r.domElement.toDataURL('image/png');
+      sc.remove(obj);
+    } catch (e) { console.warn('portrait failed for', spr, e); }
   }
   r.dispose();
   return portraitCache;
