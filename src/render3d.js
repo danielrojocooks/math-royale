@@ -608,10 +608,11 @@ function updateCannon(dt) {
 // lift it. Fire is still a particle jet (model has no breath clip). Tunable:
 const DRAGON_SCALE = 0.6;         // ~12.4 model units wide -> ~7.4 world units
 const DRAGON_YAW = 0;             // model nose is at local +Z; aligns nose with travel
-const DRAGON_ALT = 7.0;           // cruise altitude over the field
+const DRAGON_ALT = 5.8;           // cruise altitude over the field (lower = stays in frame)
 const DRAGON_CENTER = [0, -1.36, 0];  // lift feet-at-origin model so its body centers
 const DRAGON_HEAD = 3.2;          // world dist from body center to mouth (fire origin)
-const DRAGON_ZSPAN = 3.0;         // diagonal: how far the path swings in depth (SE<->NW)
+const DRAGON_ZSPAN = 2.0;         // diagonal: how far the path swings in depth (SE<->NW)
+const DRAGON_SOUTH = 2.0;         // bias path toward the bottom so the north end stays on screen
 
 function makeDragon() {
   const inner = SkeletonUtils.clone(assets.dragon);
@@ -655,7 +656,7 @@ export function fireDragon(tx, tz, onImpact) {
   // (and the fire out the mouth) always lead.
   const dir = Math.random() < 0.5 ? 1 : -1;
   const fromX = dir * 12, toX = -dir * 12;
-  const fromZ = target.z + dir * DRAGON_ZSPAN, toZ = target.z - dir * DRAGON_ZSPAN;
+  const fromZ = target.z + dir * DRAGON_ZSPAN + DRAGON_SOUTH, toZ = target.z - dir * DRAGON_ZSPAN + DRAGON_SOUTH;
   const yaw = Math.atan2(toX - fromX, toZ - fromZ) + DRAGON_YAW;
   const { g: obj, mixer } = makeDragon();
   obj.position.set(fromX, DRAGON_ALT, fromZ);
