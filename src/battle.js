@@ -125,23 +125,28 @@ export function trySelectCard(i) {
   S.shake = .12; return false;
 }
 export function tryDeploy(x, y) {
-  // Anywhere on YOUR half counts (CR rule); the drop point clamps into the deploy band.
-  if (S.sel < 0 || y < RIVER_B + 10) return false;
+  // Deploy ANYWHERE on the field (kid-friendly: no dead spots, no your-half rule).
+  // The tap lands the troop where you tapped; x snaps to the nearest lane so the
+  // lane-based combat still works, y is free across the whole board.
+  if (S.sel < 0) return false;
   const d = _activeDeck[S.sel];
   const cost = d.cost ?? d.val;
   if (cost > S.elixir) return false;
   S.elixir -= cost;
   const lane = x < 380 ? 0 : 1;
-  const dy = Math.max(DEPLOY_MIN, Math.min(DEPLOY_MAX, y));
+  const dy = Math.max(FIELD_TOP, Math.min(FIELD_BOT, y));
   const n = d.count ?? 1;
   // squads fan out in a small formation (offsets are visual; lane combat unchanged)
   for (let i = 0; i < n; i++) {
     const xoff = (i - (n - 1) / 2) * 30;
     const yoff = (i % 2) * 34;
-    mkTroop('you', lane, Math.min(DEPLOY_MAX, dy + yoff), d.val, d.spr, xoff);
+    mkTroop('you', lane, Math.min(FIELD_BOT, dy + yoff), d.val, d.spr, xoff);
   }
   S.sel = -1; return true;
 }
+// Deploy band = the whole playable field (just below the enemy castle line down
+// to just above your king), so any tap is a valid drop.
+const FIELD_TOP = 150, FIELD_BOT = 940;
 
 // ---- gate exports ----
 
