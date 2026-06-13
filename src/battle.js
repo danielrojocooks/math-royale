@@ -200,16 +200,16 @@ function towerFire(dt) {
     if (tw.dead || tw.kind !== 'king') continue;
     tw.atkcd -= dt;
     if (tw.atkcd > 0) continue;
-    let best = null, bd = 215;
+    let best = null, bd = 160;                          // shorter range: troops can close in
     for (const t of S.troops) {
       if (t.dead || t.side === tw.side || t.grabbed) continue;
       const d = Math.hypot(t.x - tw.x, t.y - tw.y);
       if (d < bd) { bd = d; best = t; }
     }
     if (!best) { tw.atkcd = 0.3; continue; }            // scan faster when nothing in range
-    const levelScale = 1 + (_cfg.level - 1) * 0.18;     // faster each arena
-    const matchRamp = 1 + Math.min(0.6, S.T / 150);     // gentle within-match speed-up
-    tw.atkcd = 0.7 / (levelScale * matchRamp);
+    const levelScale = 1 + (_cfg.level - 1) * 0.1;      // a bit faster each arena
+    const matchRamp = 1 + Math.min(0.4, S.T / 180);     // gentle within-match speed-up
+    tw.atkcd = 1.3 / (levelScale * matchRamp);          // slow enough that a wave can break through
     S.arrows.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y });   // render draws the flying arrow
     best.val -= 1; best.flash = .2; best.hit = .2;
     popup(best.x, best.y - 30, '-1', tw.side === 'you' ? '#bff' : '#fbb');
