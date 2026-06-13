@@ -1,6 +1,6 @@
 // Battle simulation: all game state and rules. NO rendering, NO DOM, NO canvas.
 // render2d.js reads S to draw; input.js calls the exported actions.
-import { LANE, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK as DEFAULT_DECK, FOES } from '../data/units.js';
+import { LANE, RIVER_T, RIVER_B, DEPLOY_MIN, DEPLOY_MAX, SPEED, DECK as DEFAULT_DECK, FOES } from '../data/units.js';
 
 // ---- active deck (set by setDeck; defaults to data/units.js DECK) ----
 let _activeDeck = DEFAULT_DECK;
