@@ -85,6 +85,10 @@ function startMatch(profile, arenaId, isBoss) {
     tentacle: (arena.theme.riverShape === 'none') ? null
       : { period: Math.max(2.4, 7.6 - arenaId * 0.8), reach: 52 + arenaId * 12 },
     level: arenaId,   // scales king fire rate
+    // Gentler early arenas (Arena 1 tuned for the 6yo): enemies advance at half
+    // speed and enemy towers have less HP, ramping to full by the later arenas.
+    foeSpeed: Math.min(1, 0.5 + (arenaId - 1) * 0.12),
+    foeTowerHp: Math.min(1, 0.6 + (arenaId - 1) * 0.08),
   });
 
   // 2. Resolve profile.deck ids through the roster and arm the active deck.

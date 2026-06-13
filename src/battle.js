@@ -24,12 +24,14 @@ let _cfg = { foeMaxVal: Infinity, bossSpawn: null, tentacle: null };
  * tentacle: { period, reach } river hazard intensity, or null to disable.
  * @param {{ foeMaxVal?: number, bossSpawn?: {spr:string, val:number}|null, tentacle?: {period:number,reach:number}|null }} opts
  */
-export function configureBattle({ foeMaxVal, bossSpawn, tentacle, level } = {}) {
+export function configureBattle({ foeMaxVal, bossSpawn, tentacle, level, foeSpeed, foeTowerHp } = {}) {
   _cfg = {
     foeMaxVal: foeMaxVal ?? Infinity,
     bossSpawn: bossSpawn ?? null,
     tentacle: tentacle ?? null,
-    level: level ?? 1,          // arena number; scales king fire rate
+    level: level ?? 1,             // arena number; scales king fire rate
+    foeSpeed: foeSpeed ?? 1,       // enemy march speed multiplier (gentler early arenas)
+    foeTowerHp: foeTowerHp ?? 1,   // enemy tower HP multiplier (easier to break early)
   };
 }
 
@@ -60,9 +62,11 @@ export function reset() {
 
   // Castles spread further apart -> longer marches, more board to play.
   // Enemy pushed back toward the top edge + player front nudged back to lengthen
-  // the contested middle (longer matches).
+  // the contested middle (longer matches). Enemy tower HP scales down on early
+  // arenas (foeTowerHp); player towers stay full strength.
+  const fp = Math.round(14 * _cfg.foeTowerHp), fk = Math.round(40 * _cfg.foeTowerHp);
   S.towers = [
-    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 40),
+    tower('foe', 'prin', LANE[0], 150, 0, fp), tower('foe', 'prin', LANE[1], 150, 1, fp), tower('foe', 'king', 380, 40, -1, fk),
     tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 40),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
@@ -366,7 +370,7 @@ export function update(dt) {
     }
     if (foe && fd < 260 && fd > 42) {
       const chaseDir = Math.sign(foe.y - t.y);
-      t.y += chaseDir * SPEED * dt; t.moving = true; t.walk += dt * 8; t.atk = 0; t.atkcd = .25;
+      t.y += chaseDir * (t.side === 'foe' ? SPEED * _cfg.foeSpeed : SPEED) * dt; t.moving = true; t.walk += dt * 8; t.atk = 0; t.atkcd = .25;
       t.dust -= dt; if (t.dust <= 0) { dust(t.x, t.y + (46 + t.maxval * 10) * 0.46); t.dust = .3; }
       continue;                                  // combat pass resolves on contact
     }
@@ -375,7 +379,7 @@ export function update(dt) {
     const dir = t.side === 'you' ? -1 : 1, stopY = tw.y - dir * 60;
     const inRange = !((dir < 0 && t.y > stopY) || (dir > 0 && t.y < stopY));
     if (!inRange) {
-      t.y += dir * SPEED * dt; t.moving = true; t.walk += dt * 8; t.atk = 0; t.atkcd = .25;
+      t.y += dir * (t.side === 'foe' ? SPEED * _cfg.foeSpeed : SPEED) * dt; t.moving = true; t.walk += dt * 8; t.atk = 0; t.atkcd = .25;
       t.dust -= dt; if (t.dust <= 0) { dust(t.x, t.y + (46 + t.maxval * 10) * 0.46); t.dust = .3; }
     } else {
       t.moving = false;

@@ -50,14 +50,14 @@ function injectStyles() {
   s.textContent = `
 #gate-card {
   position: fixed; z-index: 60;
-  left: 50%; top: 26%;               /* center, below the enemy castle, above the river */
+  left: 50%; top: 34%;               /* a bit lower on screen */
   transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
   border: 4px solid rgba(255,207,77,.85);
   border-radius: 16px;
-  padding: 8px 16px 10px;
-  min-width: 150px; max-width: 200px;
+  padding: 12px 22px 14px;
+  min-width: 184px; max-width: 244px;
   text-align: center;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0,0,0,.45);
@@ -75,7 +75,7 @@ function injectStyles() {
 @keyframes gate-drop-in { from { transform: translateX(-50%) translateY(-40px) scale(.6); opacity: 0; }
                           to   { transform: translateX(-50%) translateY(0) scale(1);  opacity: 1; } }
 #gate-card .eq {
-  font-size: clamp(26px, 5vw, 36px);
+  font-size: clamp(30px, 5.6vw, 44px);
   font-weight: 900; color: #5a3a10;
   letter-spacing: 1px; line-height: 1.1;
 }
