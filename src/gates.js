@@ -19,7 +19,7 @@
 // Build-exact-N lives on in catapult-puzzle.html -> Training Grounds (E8).
 
 import { S, cannonPickTarget, cannonResolve } from './battle.js';
-import { worldToScreen, fireCannon, fireDragon } from './render3d.js';
+import { worldToScreen, fireWeapon } from './render3d.js';
 import { pickGateFact, scaffoldTier, recordAttempt } from './mastery.js';
 import { loadProfile, saveProfile, getActiveProfileId } from './store.js';
 
@@ -276,10 +276,9 @@ function resolve(correct) {
     // the reward IS the cannon shot: pick a target, fire, kill on impact.
     // (No +power/heal — the on-field boom is the whole payoff. Playtest: an
     // abstract reward lost to the battle; an explosion the kid caused does not.)
-    // EVALUATION: firing the CATAPULT on every solve so it can be seen/tuned.
-    // (Dragon path is fireDragon — same signature. Becomes per-arena alternation.)
+    // fire this arena's weapon (cannon or dragon — set per-arena via setWeapon)
     const target = cannonPickTarget();
-    if (target) fireCannon(target.x, target.y, () => cannonResolve(target));
+    if (target) fireWeapon(target.x, target.y, () => cannonResolve(target));
     const r = cardEl.getBoundingClientRect();
     confettiAt(r.left + r.width / 2, r.top + r.height / 2);
     cardEl.classList.add('solved');

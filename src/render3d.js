@@ -71,8 +71,9 @@ function rebuildTheme() {
 }
 let towersBuilt = false, towerVis = new Map(), troopVis = new Map();
 let partVis = new Map(), matCache = {};
-let cannonObj = null, cannonProjectiles = [];   // catapult on your king + in-flight shots
+let cannonObj = null, cannonProjectiles = [];   // cannon on your king + in-flight shots
 let dragons = [];                                // active fly-in dragons (fire-breath on solve)
+let currentWeapon = 'cannon';                    // per-arena: 'cannon' or 'dragon' (set by main.js)
 
 export function initRender(canvas) {
   ren = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -336,8 +337,9 @@ function syncTowers(S) {
       hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 4.8 : 3.6) : 2.9, bz(t.y));
       scene.add(hpBadge);
       towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false });
-      // mount the catapult on YOUR king tower (fires on a solved math card)
-      if (t.side === 'you' && t.kind === 'king') {
+      // mount the cannon on YOUR king tower — only on cannon stages (dragon
+      // stages have no cannon; the dragon flies in instead)
+      if (t.side === 'you' && t.kind === 'king' && currentWeapon === 'cannon') {
         cannonObj = buildCannon();
         cannonObj.position.set(bx(t.x), 2.9, bz(t.y) + 0.7);   // on the roofline, toward camera
         scene.add(cannonObj);
@@ -522,7 +524,7 @@ const CANNON_SCALE = 1.9;     // catapult size on the castle roof
 const CANNON_YAW = Math.PI;   // face the enemy (-Z); flip if it points the wrong way
 
 function buildCannon() {
-  return assets.catapult ? buildCatapult() : buildPrimitiveCannon();
+  return buildPrimitiveCannon();   // primitive barrel (the KayKit catapult arm read weak)
 }
 
 function buildCatapult() {
@@ -734,6 +736,16 @@ function updateDragons(dt) {
       if (d.onImpact) d.onImpact();
     }
   }
+}
+
+/** setWeapon — choose this arena's solve weapon ('cannon' or 'dragon'). Call before
+ *  the match resets so syncTowers mounts (or skips) the cannon accordingly. */
+export function setWeapon(w) { currentWeapon = w === 'dragon' ? 'dragon' : 'cannon'; }
+
+/** fireWeapon — fire whichever weapon this arena uses (gates.js calls this on a solve). */
+export function fireWeapon(tx, tz, onImpact) {
+  if (currentWeapon === 'dragon') fireDragon(tx, tz, onImpact);
+  else fireCannon(tx, tz, onImpact);
 }
 
 // ---- public API (matches render2d.js) ----
