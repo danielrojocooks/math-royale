@@ -109,7 +109,12 @@ function resize() {
   // (desktop). No fat minimum distance — a landscape window gets a close camera
   // instead of a tiny field floating in blank green margins.
   const vF = Math.tan((cam.fov / 2) * Math.PI / 180);
-  const fitW = 9.5 / (vF * cam.aspect) * 0.66;     // field half-width ~9.0 + margin
+  const portrait = cam.aspect < 1;
+  // Portrait (the tablet, primary view) zooms in: a tighter half-width target
+  // pulls the camera closer so the lanes/castles fill the screen instead of
+  // sitting in green side margins. Landscape stays depth-bound (target unused).
+  const halfW = portrait ? 7.4 : 9.5;
+  const fitW = halfW / (vF * cam.aspect) * 0.66;
   const fitD = 10.8 / vF * 0.66;                   // full depth incl BOTH castles
   const dist = Math.max(9.0, fitW, fitD);
   // slightly oblique CR tilt, centered so both castles are on screen
