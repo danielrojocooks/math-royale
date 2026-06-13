@@ -36,7 +36,7 @@ export function setFactPools(pool, earlier) {
 }
 
 const IDLE_SUBMIT_MS = 700;    // pause after last tap = submit (snappier)
-const COOLDOWN_MS = 8000;      // per-board cooldown between math cards
+const COOLDOWN_MS = 3500;      // per-board cooldown between math cards (frequent reps)
 
 let cardEl = null;             // the single floating card (one at a time)
 let cardState = null;          // { tower, factId, a, b, sum, count, firstTapAt, idleTimer, tier, missed }
