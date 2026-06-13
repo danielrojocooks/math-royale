@@ -201,7 +201,7 @@ export function update(dt) {
   if (S.over) { decay(dt); return; }
   if (S.paused) return;  // gate is open — freeze simulation (decay also skipped for clean freeze)
   S.elixir = Math.min(10, S.elixir + dt / 1.6);
-  S.foeElixir = Math.min(10, S.foeElixir + dt / 1.6);
+  S.foeElixir = Math.min(10, S.foeElixir + dt / 1.3);   // enemy banks power faster (difficulty)
 
   // enemy AI: deploy a random affordable villain every few seconds.
   // foeMaxVal cap (from configureBattle) restricts which villains may spawn.
@@ -212,7 +212,7 @@ export function update(dt) {
       const f = aff[Math.floor(Math.random() * aff.length)];
       S.foeElixir -= f.val;
       mkTroop('foe', Math.floor(Math.random() * 2), 250, f.val, f.spr);
-      S.foeTimer = 2.6 + Math.random() * 2.4;
+      S.foeTimer = 1.8 + Math.random() * 1.8;   // spawns more often (difficulty)
     } else S.foeTimer = .6;
   }
 
