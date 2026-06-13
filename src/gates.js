@@ -158,18 +158,15 @@ function confettiAt(x, y) {
 }
 
 // ─── answer-choice distractors (recall mode) ─────────────────────────────────
+// Always ASCENDING so the 2x2 grid reads top-left -> bottom-right low-to-high
+// (highest always bottom-right) — a consistent number-line layout to scan.
 function makeChoices(sum) {
   const set = new Set([sum]);
   for (const d of [sum - 1, sum + 1, sum - 2, sum + 2, sum + 3]) {
     if (set.size >= 4) break;
     if (d >= 1) set.add(d);
   }
-  const arr = [...set];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
+  return [...set].sort((a, b) => a - b);
 }
 
 // ─── card lifecycle ──────────────────────────────────────────────────────────

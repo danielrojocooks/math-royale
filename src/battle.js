@@ -40,6 +40,7 @@ export const S = {
   paused: false,  // set true while a gate modal is open; update() skips sim
   deck: DEFAULT_DECK,  // mirrors _activeDeck; renderers/HUD read this
   tentacles: [], tentTimer: 0,  // river hazard (configureBattle.tentacle)
+  arrows: [],  // per-frame tower-shot events {x,y,tx,ty}; render draws + clears them
 };
 
 // Tentacle hazard phase timings (seconds)
@@ -67,6 +68,7 @@ export function reset() {
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
   S.sel = -1; S.shake = 0; S.over = null; S.T = 0; S.paused = false;
   S.tentacles = []; S.tentTimer = _cfg.tentacle ? 2.5 + Math.random() * 2 : 1e9;
+  S.arrows = [];
 
   // ── Boss spawn: drop the boss unit on the foe side ~1s after match start.
   if (_cfg.bossSpawn) {
@@ -206,12 +208,7 @@ function towerFire(dt) {
     if (!best) { tw.atkcd = 0.3; continue; }            // scan faster when nothing in range
     const ramp = 1 + Math.min(1.0, S.T / 100);          // archers speed up as the match drags on
     tw.atkcd = (tw.kind === 'king' ? 0.7 : 0.95) / ramp;
-    // arrow streak from tower to target
-    for (let i = 1; i <= 5; i++) {
-      const f = i / 6;
-      S.parts.push({ x: tw.x + (best.x - tw.x) * f, y: tw.y + (best.y - tw.y) * f,
-        vx: 0, vy: 0, life: .16, color: '#ffe9b0', r: 3 });
-    }
+    S.arrows.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y });   // render draws the flying arrow
     best.val -= 1; best.flash = .2; best.hit = .2;
     popup(best.x, best.y - 30, '-1', tw.side === 'you' ? '#bff' : '#fbb');
     burst(best.x, best.y, '#fff', 4, 120);

@@ -893,6 +893,31 @@ export function fireWeapon(tx, tz, onImpact) {
   else fireCannon(tx, tz, onImpact);
 }
 
+// ---- tower arrows: bright projectiles arcing from a tower to its target ----
+let renderArrows = [];
+function spawnArrows(S) {
+  if (!S.arrows || !S.arrows.length) return;
+  for (const a of S.arrows) {
+    const from = new THREE.Vector3(bx(a.x), 1.5, bz(a.y));
+    const to = new THREE.Vector3(bx(a.tx), 0.9, bz(a.ty));
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.55, 6),
+      new THREE.MeshBasicMaterial({ color: 0xfff0a0 }));
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+    m.position.copy(from); scene.add(m);
+    renderArrows.push({ mesh: m, from, to, t: 0, dur: 0.13 });
+  }
+  S.arrows.length = 0;   // consume the per-frame events
+}
+function updateArrows(dt) {
+  for (let i = renderArrows.length - 1; i >= 0; i--) {
+    const a = renderArrows[i]; a.t += dt;
+    const f = Math.min(1, a.t / a.dur);
+    a.mesh.position.lerpVectors(a.from, a.to, f);
+    a.mesh.position.y += Math.sin(f * Math.PI) * 0.35;          // slight arc
+    if (f >= 1) { scene.remove(a.mesh); a.mesh.geometry.dispose(); a.mesh.material.dispose(); renderArrows.splice(i, 1); }
+  }
+}
+
 // ---- public API (matches render2d.js) ----
 export function render(S) {
   const dt = Math.min(0.05, clock.getDelta());
@@ -900,6 +925,8 @@ export function render(S) {
   syncTroops(S, dt);
   syncParts(S, dt);
   syncTentacles(S);
+  spawnArrows(S);
+  updateArrows(dt);
   updateCannon(dt);
   updateDragons(dt);
   // camera shake
