@@ -62,8 +62,8 @@ export function reset() {
   // Enemy pushed back toward the top edge + player front nudged back to lengthen
   // the contested middle (longer matches).
   S.towers = [
-    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 60),
-    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 60),
+    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 40),
+    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 40),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
@@ -200,7 +200,7 @@ function towerFire(dt) {
     if (tw.dead || tw.kind !== 'king') continue;
     tw.atkcd -= dt;
     if (tw.atkcd > 0) continue;
-    let best = null, bd = 250;                          // reach to engage units approaching the king
+    let best = null, bd = 185;                          // reach: defends the approach, but troops can close in
     for (const t of S.troops) {
       if (t.dead || t.side === tw.side || t.grabbed) continue;
       const d = Math.hypot(t.x - tw.x, t.y - tw.y);
@@ -286,7 +286,7 @@ export function cannonResolve(target) {
     kill(target.troop);
     S.shake = Math.max(S.shake, .32);
   } else if (target.tower && !target.tower.dead) {
-    target.tower.hp -= 2; target.tower.flash = .3;
+    target.tower.hp -= 4; target.tower.flash = .3;     // solve chips the enemy king when the lane is clear
     if (target.tower.hp <= 0) { target.tower.dead = true; towerFx(target.tower); }
     S.shake = Math.max(S.shake, .32);
   }
