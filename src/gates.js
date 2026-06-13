@@ -35,7 +35,7 @@ export function setFactPools(pool, earlier) {
   EARLIER_POOLS = earlier || [];
 }
 
-const IDLE_SUBMIT_MS = 700;    // pause after last tap = submit (snappier)
+const IDLE_SUBMIT_MS = 1200;   // pause after last tap = submit (room to count between taps)
 const COOLDOWN_MS = 3500;      // per-board cooldown between math cards (frequent reps)
 
 let cardEl = null;             // the single floating card (one at a time)
