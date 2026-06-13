@@ -610,8 +610,8 @@ const DRAGON_SCALE = 0.6;         // ~12.4 model units wide -> ~7.4 world units
 const DRAGON_YAW = 0;             // model nose is at local +Z; aligns nose with travel
 const DRAGON_ALT = 7.0;           // cruise altitude over the field
 const DRAGON_CENTER = [0, -1.36, 0];  // lift feet-at-origin model so its body centers
-const DRAGON_HEAD = 2.2;          // world dist from body center to mouth (fire origin)
-const DRAGON_ZSPAN = 5.0;         // diagonal: how far the path swings in depth (SE<->NW)
+const DRAGON_HEAD = 3.2;          // world dist from body center to mouth (fire origin)
+const DRAGON_ZSPAN = 3.0;         // diagonal: how far the path swings in depth (SE<->NW)
 
 function makeDragon() {
   const inner = SkeletonUtils.clone(assets.dragon);
@@ -630,17 +630,17 @@ function makeDragon() {
 function breatheFire(from, tx, tz) {
   const to = new THREE.Vector3(tx, 0.6, tz);
   const dir = to.clone().sub(from).normalize();
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 36; i++) {
     const sp = softSprite(i % 2 ? 0xff7a1e : 0xffcf4d);
-    sp.scale.setScalar(0.4 + Math.random() * 0.55);
+    sp.scale.setScalar(0.6 + Math.random() * 0.8);
     sp.position.copy(from);
     scene.add(sp);
-    const s = 6 + Math.random() * 5, spr = 1.8;
+    const s = 7 + Math.random() * 6, spr = 2.1;
     localParts.push({ sp,
       vx: dir.x * s + (Math.random() - 0.5) * spr,
       vy: dir.y * s + (Math.random() - 0.5) * spr,
       vz: dir.z * s + (Math.random() - 0.5) * spr,
-      life: 0.5 + Math.random() * 0.3, maxlife: 0.8, own: true });
+      life: 0.55 + Math.random() * 0.35, maxlife: 0.9, own: true });
   }
 }
 
@@ -654,14 +654,14 @@ export function fireDragon(tx, tz, onImpact) {
   // at mid-pass. Heading is derived from the actual travel vector so the nose
   // (and the fire out the mouth) always lead.
   const dir = Math.random() < 0.5 ? 1 : -1;
-  const fromX = dir * 15, toX = -dir * 15;
+  const fromX = dir * 12, toX = -dir * 12;
   const fromZ = target.z + dir * DRAGON_ZSPAN, toZ = target.z - dir * DRAGON_ZSPAN;
   const yaw = Math.atan2(toX - fromX, toZ - fromZ) + DRAGON_YAW;
   const { g: obj, mixer } = makeDragon();
   obj.position.set(fromX, DRAGON_ALT, fromZ);
   obj.rotation.y = yaw;
   scene.add(obj);
-  dragons.push({ obj, mixer, t: 0, dur: 1.9, fromX, toX, fromZ, toZ, yaw, target, fired: false, onImpact });
+  dragons.push({ obj, mixer, t: 0, dur: 2.9, fromX, toX, fromZ, toZ, yaw, target, fired: false, onImpact });
 }
 
 function updateDragons(dt) {
