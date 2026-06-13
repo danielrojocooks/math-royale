@@ -192,7 +192,7 @@ function openCard(reward) {
 
   cardEl = document.createElement('div');
   cardEl.id = 'gate-card';
-  const rewardLabel = '💥 FIRE THE CANNON!';
+  const rewardLabel = '💥 SOLVE TO ATTACK!';
   if (mode === 'count') {
     cardEl.innerHTML = `
       <div class="reward">${rewardLabel}</div>

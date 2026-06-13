@@ -172,9 +172,12 @@ async function loadAssets() {
     Promise.allSettled(PROPS_GLB.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf.glb'))),
     Promise.allSettled(WEAPONS.map(n => loadGlb(loader, 'assets/game/weapons/' + n + '.gltf')))
       .then(rs => { assets.weapons = {}; rs.forEach((r, i) => { if (r.status === 'fulfilled') assets.weapons[WEAPONS[i]] = r.value.scene; }); }),
-    // Dragon (different maker; optional — game runs fine if it fails to load)
+    // Dragon (MattBas, CC BY-SA 4.0; optional — game runs fine if it fails to load)
     Promise.allSettled([loadGlb(loader, 'assets/game/dragon.glb')])
-      .then(rs => { assets.dragon = rs[0].status === 'fulfilled' ? rs[0].value.scene : null; }),
+      .then(rs => {
+        if (rs[0].status === 'fulfilled') { assets.dragon = rs[0].value.scene; assets.dragonClips = rs[0].value.animations || []; }
+        else { assets.dragon = null; assets.dragonClips = []; }
+      }),
   ]);
   for (const lib of libs) for (const c of lib.animations) assets.clips[c.name] = c;
   names.forEach((n, i) => { assets.chars[n] = chars[i].scene; });
@@ -600,12 +603,13 @@ function updateCannon(dt) {
 }
 
 // ---- fly-in dragon: swoops across, breathes fire on the target (solve reward) ----
-// The model is from a different maker (no animation clips, ~25x bigger, off-origin),
-// so we normalize scale/position and fake life procedurally. Tunable constants:
-const DRAGON_SCALE = 0.13;        // wingspan ~52 model units -> ~6.8 world units
+// Model: MattBas dragon (CC BY-SA 4.0) — ships a real Flying-loop animation, so the
+// wings actually flap. Authored at ~12-unit wingspan, feet at origin; we scale and
+// lift it. Fire is still a particle jet (model has no breath clip). Tunable:
+const DRAGON_SCALE = 0.5;         // ~12.4 model units wide -> ~6.2 world units
 const DRAGON_YAW = Math.PI / 2;   // base facing so the nose points along travel (tune)
 const DRAGON_ALT = 7.0;           // cruise altitude over the field
-const DRAGON_CENTER = [0, -8.69, 7.63];  // recenter offset from bbox inspection
+const DRAGON_CENTER = [0, -1.36, 0];  // lift feet-at-origin model so its body centers
 
 function makeDragon() {
   const inner = SkeletonUtils.clone(assets.dragon);
@@ -614,7 +618,11 @@ function makeDragon() {
   const g = new THREE.Group();
   g.add(inner);
   g.scale.setScalar(DRAGON_SCALE);
-  return g;
+  // play the flying-flap animation
+  let mixer = null;
+  const fly = (assets.dragonClips || []).find(c => /fly/i.test(c.name));
+  if (fly) { mixer = new THREE.AnimationMixer(inner); mixer.clipAction(fly).reset().play(); }
+  return { g, mixer };
 }
 
 function breatheFire(from, tx, tz) {
@@ -642,17 +650,18 @@ export function fireDragon(tx, tz, onImpact) {
   const target = { x: bx(tx), z: bz(tz) };
   const dir = Math.random() < 0.5 ? 1 : -1;     // L->R or R->L
   const fromX = -dir * 15, toX = dir * 15;
-  const obj = makeDragon();
+  const { g: obj, mixer } = makeDragon();
   const z = target.z - 1.2;
   obj.position.set(fromX, DRAGON_ALT, z);
   scene.add(obj);
-  dragons.push({ obj, t: 0, dur: 1.9, fromX, toX, z, dir, target, fired: false, onImpact });
+  dragons.push({ obj, mixer, t: 0, dur: 1.9, fromX, toX, z, dir, target, fired: false, onImpact });
 }
 
 function updateDragons(dt) {
   for (let i = dragons.length - 1; i >= 0; i--) {
     const d = dragons[i];
     d.t += dt;
+    if (d.mixer) d.mixer.update(dt);
     const f = d.t / d.dur;
     if (f >= 1) { scene.remove(d.obj); dragons.splice(i, 1); continue; }
     d.obj.position.x = d.fromX + (d.toX - d.fromX) * f;
