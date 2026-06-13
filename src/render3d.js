@@ -497,7 +497,7 @@ function buildCannon() {
   rim.position.z = -0.62; pivot.add(rim);
   pivot.rotation.x = 0.32;                  // tilt the muzzle up
   g.add(pivot);
-  g.scale.setScalar(2.4);
+  g.scale.setScalar(2.15);
   g.userData = { pivot, recoil: 0 };
   return g;
 }
@@ -506,11 +506,11 @@ function buildCannon() {
 function bigBoom(pos) {
   for (let i = 0; i < 40; i++) {
     const sp = new THREE.Sprite(mat(i % 4 ? (i % 2 ? 0xff8a1e : 0xffcf4d) : 0xffffff));
-    sp.scale.setScalar(0.35 + Math.random() * 0.55);
+    sp.scale.setScalar(0.32 + Math.random() * 0.5);
     sp.position.copy(pos); sp.position.y += 0.8;
     scene.add(sp);
-    const a = Math.random() * 6.28, s = 4 + Math.random() * 7;
-    localParts.push({ sp, vx: Math.cos(a) * s, vy: 3.5 + Math.random() * 5.5, vz: Math.sin(a) * s, life: 0.8 + Math.random() * 0.3 });
+    const a = Math.random() * 6.28, s = 3.6 + Math.random() * 6.3;
+    localParts.push({ sp, vx: Math.cos(a) * s, vy: 3.15 + Math.random() * 4.95, vz: Math.sin(a) * s, life: 0.8 + Math.random() * 0.3 });
   }
 }
 
