@@ -606,10 +606,12 @@ function updateCannon(dt) {
 // Model: MattBas dragon (CC BY-SA 4.0) — ships a real Flying-loop animation, so the
 // wings actually flap. Authored at ~12-unit wingspan, feet at origin; we scale and
 // lift it. Fire is still a particle jet (model has no breath clip). Tunable:
-const DRAGON_SCALE = 0.5;         // ~12.4 model units wide -> ~6.2 world units
-const DRAGON_YAW = Math.PI / 2;   // base facing so the nose points along travel (tune)
+const DRAGON_SCALE = 0.6;         // ~12.4 model units wide -> ~7.4 world units
+const DRAGON_YAW = Math.PI;       // model nose is at local -Z; +PI makes it LEAD travel
 const DRAGON_ALT = 7.0;           // cruise altitude over the field
 const DRAGON_CENTER = [0, -1.36, 0];  // lift feet-at-origin model so its body centers
+const DRAGON_HEAD = 2.2;          // world dist from body center to mouth (fire origin)
+const DRAGON_ZSPAN = 5.0;         // diagonal: how far the path swings in depth (SE<->NW)
 
 function makeDragon() {
   const inner = SkeletonUtils.clone(assets.dragon);
@@ -648,13 +650,18 @@ function breatheFire(from, tx, tz) {
 export function fireDragon(tx, tz, onImpact) {
   if (!ready || !assets.dragon) { if (onImpact) onImpact(); return; }
   const target = { x: bx(tx), z: bz(tz) };
-  const dir = Math.random() < 0.5 ? 1 : -1;     // L->R or R->L
-  const fromX = -dir * 15, toX = dir * 15;
+  // Diagonal flight: dir=+1 is SE->NW, dir=-1 is NW->SE. Crosses over the target
+  // at mid-pass. Heading is derived from the actual travel vector so the nose
+  // (and the fire out the mouth) always lead.
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const fromX = dir * 15, toX = -dir * 15;
+  const fromZ = target.z + dir * DRAGON_ZSPAN, toZ = target.z - dir * DRAGON_ZSPAN;
+  const yaw = Math.atan2(toX - fromX, toZ - fromZ) + DRAGON_YAW;
   const { g: obj, mixer } = makeDragon();
-  const z = target.z - 1.2;
-  obj.position.set(fromX, DRAGON_ALT, z);
+  obj.position.set(fromX, DRAGON_ALT, fromZ);
+  obj.rotation.y = yaw;
   scene.add(obj);
-  dragons.push({ obj, mixer, t: 0, dur: 1.9, fromX, toX, z, dir, target, fired: false, onImpact });
+  dragons.push({ obj, mixer, t: 0, dur: 1.9, fromX, toX, fromZ, toZ, yaw, target, fired: false, onImpact });
 }
 
 function updateDragons(dt) {
@@ -665,12 +672,16 @@ function updateDragons(dt) {
     const f = d.t / d.dur;
     if (f >= 1) { scene.remove(d.obj); dragons.splice(i, 1); continue; }
     d.obj.position.x = d.fromX + (d.toX - d.fromX) * f;
+    d.obj.position.z = d.fromZ + (d.toZ - d.fromZ) * f;
     d.obj.position.y = DRAGON_ALT - Math.sin(f * Math.PI) * 1.6;   // dip toward the field mid-pass
-    d.obj.rotation.y = d.dir > 0 ? DRAGON_YAW : DRAGON_YAW + Math.PI;
+    d.obj.rotation.y = d.yaw;
     d.obj.rotation.z = Math.sin(d.t * 7) * 0.07;                   // subtle bank/wingbeat life
     if (!d.fired && f >= 0.5) {
       d.fired = true;
-      breatheFire(d.obj.position.clone(), d.target.x, d.target.z);
+      // fire erupts from the MOUTH: a point out the front of the dragon (nose leads)
+      const fwd = new THREE.Vector3(d.toX - d.fromX, 0, d.toZ - d.fromZ).normalize();
+      const mouth = d.obj.position.clone().addScaledVector(fwd, DRAGON_HEAD); mouth.y -= 0.4;
+      breatheFire(mouth, d.target.x, d.target.z);
       bigBoom(new THREE.Vector3(d.target.x, 0.6, d.target.z));
       if (d.onImpact) d.onImpact();
     }
