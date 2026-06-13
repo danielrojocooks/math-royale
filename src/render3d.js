@@ -889,6 +889,9 @@ function syncTentacles(S) {
  *  the match resets so syncTowers mounts (or skips) the cannon accordingly. */
 export function setWeapon(w) { currentWeapon = w === 'dragon' ? 'dragon' : 'cannon'; }
 
+/** getWeapon — current arena's solve weapon ('cannon' or 'dragon'), for the card label. */
+export function getWeapon() { return currentWeapon; }
+
 /** setArenaLevel — arena number; controls king archer count (2 from arena 3). */
 export function setArenaLevel(n) { arenaLevel = n || 1; }
 

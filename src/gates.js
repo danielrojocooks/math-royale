@@ -19,7 +19,7 @@
 // Build-exact-N lives on in catapult-puzzle.html -> Training Grounds (E8).
 
 import { S, cannonPickTarget, cannonResolve } from './battle.js';
-import { worldToScreen, fireWeapon } from './render3d.js';
+import { worldToScreen, fireWeapon, getWeapon } from './render3d.js';
 import { pickGateFact, scaffoldTier, recordAttempt } from './mastery.js';
 import { loadProfile, saveProfile, getActiveProfileId } from './store.js';
 
@@ -49,31 +49,34 @@ function injectStyles() {
   s.id = 'gates-style';
   s.textContent = `
 #gate-card {
+  /* comic starburst: red border layer (.gate-burst) behind a yellow face (.gate-inner) */
+  --burst: polygon(50% 0%, 63.8% 16.7%, 85.4% 14.6%, 83.3% 36.2%, 100% 50%, 83.3% 63.8%,
+    85.4% 85.4%, 63.8% 83.3%, 50% 100%, 36.2% 83.3%, 14.6% 85.4%, 16.7% 63.8%,
+    0% 50%, 16.7% 36.2%, 14.6% 14.6%, 36.2% 16.7%);
   position: fixed; z-index: 60;
-  left: 50%; top: 34%;               /* a bit lower on screen */
+  left: 50%; top: 33%;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(255,244,214,.55), rgba(255,217,138,.55));
-  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
-  border: 4px solid rgba(255,207,77,.85);
-  border-radius: 16px;
-  padding: 12px 22px 14px;
-  min-width: 184px; max-width: 244px;
-  text-align: center;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0,0,0,.45);
   font-family: "Trebuchet MS","Segoe UI",sans-serif;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   user-select: none; -webkit-user-select: none;
-  animation: gate-drop-in .3s cubic-bezier(.2,1.4,.6,1),
-             gate-breathe 1.6s ease-in-out .4s infinite;  /* gentle pulse — draws the eye */
+  filter: drop-shadow(0 6px 11px rgba(0,0,0,.5));
+  animation: gate-pop-in .32s cubic-bezier(.2,1.7,.5,1),
+             gate-throb 1.0s ease-in-out .4s infinite;   /* urgent throb */
 }
-@keyframes gate-breathe {
-  0%, 100% { transform: translateX(-50%) scale(1); }
-  50%      { transform: translateX(-50%) scale(1.06); }
+#gate-card .gate-burst { clip-path: var(--burst); background: #e11d2b; padding: 9px; }
+#gate-card .gate-inner {
+  clip-path: var(--burst);
+  background: linear-gradient(180deg, #ffe690, #ffc238);
+  padding: clamp(30px, 7vw, 46px) clamp(34px, 8vw, 54px);
+  min-width: 150px; text-align: center;
 }
-@keyframes gate-drop-in { from { transform: translateX(-50%) translateY(-40px) scale(.6); opacity: 0; }
-                          to   { transform: translateX(-50%) translateY(0) scale(1);  opacity: 1; } }
+@keyframes gate-throb {
+  0%, 100% { transform: translateX(-50%) scale(1) rotate(-1.5deg); }
+  50%      { transform: translateX(-50%) scale(1.06) rotate(1.5deg); }
+}
+@keyframes gate-pop-in { from { transform: translateX(-50%) scale(.3); opacity: 0; }
+                         to   { transform: translateX(-50%) scale(1); opacity: 1; } }
 #gate-card .eq {
   font-size: clamp(30px, 5.6vw, 44px);
   font-weight: 900; color: #5a3a10;
@@ -96,7 +99,9 @@ function injectStyles() {
   animation: gate-pip .15s cubic-bezier(.2,1.6,.6,1); }
 @keyframes gate-pip { from { transform: scale(0); } to { transform: scale(1); } }
 #gate-card .hint { font-size: 13px; font-weight: 700; color: #a4671b; min-height: 1.1em; }
-#gate-card .reward { font-size: 11px; font-weight: 900; color: #a4671b; }
+#gate-card .reward { font-size: clamp(14px, 3.4vw, 18px); font-weight: 900; color: #d4141f;
+  letter-spacing: .5px; text-transform: uppercase; margin-bottom: 3px;
+  text-shadow: 0 1px 0 rgba(255,255,255,.45); }
 #gate-card .ans {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;
 }
@@ -191,21 +196,23 @@ function openCard(reward) {
 
   cardEl = document.createElement('div');
   cardEl.id = 'gate-card';
-  const rewardLabel = '💥 SOLVE TO ATTACK!';
+  const rewardLabel = getWeapon() === 'dragon' ? '🐉 CALL THE DRAGON!' : '💥 FIRE THE CANNON!';
   if (mode === 'count') {
-    cardEl.innerHTML = `
+    cardEl.innerHTML = `<div class="gate-burst"><div class="gate-inner">
       <div class="reward">${rewardLabel}</div>
       <div class="eq">${f.a} + ${f.b} = ?</div>
       <div class="count">tap!</div>
       <div class="pips"></div>
-      <div class="hint"></div>`;
+      <div class="hint"></div>
+    </div></div>`;
     cardEl.addEventListener('pointerdown', onTap);
   } else {
-    cardEl.innerHTML = `
+    cardEl.innerHTML = `<div class="gate-burst"><div class="gate-inner">
       <div class="reward">${rewardLabel}</div>
       <div class="eq">${f.a} + ${f.b} = ?</div>
       <div class="ans"></div>
-      <div class="hint"></div>`;
+      <div class="hint"></div>
+    </div></div>`;
     const grid = cardEl.querySelector('.ans');
     for (const choice of makeChoices(f.sum)) {
       const b = document.createElement('button');

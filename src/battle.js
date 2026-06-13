@@ -282,13 +282,21 @@ export function cannonPickTarget() {
   return null;
 }
 
+// AREA wipe radius (battle px) for the cannon/dragon strike.
+const BLAST_R = 130;
+
 /** cannonResolve — apply the hit (called by render3d at projectile impact, so the
- *  boom lands with the cannonball). Kills the troop, or chips the enemy king. */
+ *  boom lands with the strike). AREA EFFECT: wipes every enemy within BLAST_R of
+ *  the target, or chips the enemy king when the lane is clear. */
 export function cannonResolve(target) {
   if (!target) return;
-  if (target.troop && !target.troop.dead) {
-    kill(target.troop);
-    S.shake = Math.max(S.shake, .32);
+  if (target.troop) {
+    const cx = target.x, cy = target.y;                // blast center (where it was aimed)
+    for (const t of S.troops) {
+      if (t.dead || t.side !== 'foe') continue;        // wipe enemies in the blast
+      if (Math.hypot(t.x - cx, t.y - cy) <= BLAST_R) kill(t);
+    }
+    S.shake = Math.max(S.shake, .42);
   } else if (target.tower && !target.tower.dead) {
     target.tower.hp -= 4; target.tower.flash = .3;     // solve chips the enemy king when the lane is clear
     if (target.tower.hp <= 0) { target.tower.dead = true; towerFx(target.tower); }
@@ -321,7 +329,11 @@ export function update(dt) {
       const lane = liveLanes.length ? liveLanes[Math.floor(Math.random() * liveLanes.length)]
                                     : Math.floor(Math.random() * 2);
       mkTroop('foe', lane, 190, f.val, f.spr);
-      S.foeTimer = (liveLanes.length ? 1.8 : 3.6) + Math.random() * 1.8;   // king-only = slower
+      // Sparser spawns so it's waves, not a steady stream — much slower on early
+      // arenas (ramps to normal later). King-only production is slower still.
+      const lvl = Math.min(6, _cfg.level);
+      const gap = (liveLanes.length ? 2.8 : 4.6) * (1 + (6 - lvl) * 0.28);
+      S.foeTimer = gap + Math.random() * 2;
     } else S.foeTimer = .6;
   }
 
