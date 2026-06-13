@@ -335,7 +335,7 @@ function syncTowers(S) {
       // HP number floating above the tower
       const hpBadge = makeBadge(Math.max(0, Math.ceil(t.hp)), t.side === 'you' ? '#22c24a' : '#e23b3b');
       hpBadge.scale.setScalar(1.0);
-      hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 4.8 : 3.6) : 2.9, bz(t.y));
+      hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 5.6 : 3.6) : 2.9, bz(t.y));
       scene.add(hpBadge);
       towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false });
       // mount the cannon on YOUR king tower — only on cannon stages (dragon
@@ -354,7 +354,7 @@ function syncTowers(S) {
       scene.remove(v.hpBadge);
       v.hpBadge = makeBadge(hpNow, t.side === 'you' ? '#22c24a' : '#e23b3b');
       v.hpBadge.scale.setScalar(1.0);
-      v.hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 4.8 : 3.6) : 2.9, bz(t.y));
+      v.hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 5.6 : 3.6) : 2.9, bz(t.y));
       scene.add(v.hpBadge);
       v.hpShown = hpNow;
     }
