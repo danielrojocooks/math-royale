@@ -320,7 +320,7 @@ function syncTowers(S) {
       // mount the catapult on YOUR king tower (fires on a solved math card)
       if (t.side === 'you' && t.kind === 'king') {
         cannonObj = buildCannon();
-        cannonObj.position.set(bx(t.x), 2.15, bz(t.y) + 0.1);
+        cannonObj.position.set(bx(t.x), 3.1, bz(t.y) + 0.4);   // up on the roofline, toward camera
         scene.add(cannonObj);
       }
     }
@@ -497,7 +497,7 @@ function buildCannon() {
   rim.position.z = -0.62; pivot.add(rim);
   pivot.rotation.x = 0.32;                  // tilt the muzzle up
   g.add(pivot);
-  g.scale.setScalar(1.5);
+  g.scale.setScalar(2.4);
   g.userData = { pivot, recoil: 0 };
   return g;
 }
