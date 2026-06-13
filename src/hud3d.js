@@ -6,7 +6,7 @@ import { PANEL_Y } from '../data/units.js';
 import * as battle from './battle.js';
 import { worldToScreen, getPortraits } from './render3d.js';
 
-let root, elixCells, elixNum, cardEls = [], banner, bannerText;
+let root, elixCells, elixNum, cardEls = [], banner, bannerText, deployHint;
 const popEls = new Map();
 
 function injectStyles() {
@@ -43,8 +43,28 @@ function injectStyles() {
   border-radius: 50%; background: #c026a8; border: 2px solid #fff; color: #fff;
   font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
 #hud .card.dim { opacity: .4; }
-#hud .card.sel { transform: translateY(-8px); border-color: #2b7de0;
-  box-shadow: 0 0 14px rgba(43,125,224,.7); }
+#hud .card.sel { transform: translateY(-12px) scale(1.16); border-color: #5fe0ff;
+  filter: brightness(1.14) saturate(1.1);
+  box-shadow: 0 0 24px 5px rgba(95,224,255,.95);
+  animation: card-sel-pulse .7s ease-in-out infinite; z-index: 2; }
+@keyframes card-sel-pulse {
+  0%, 100% { box-shadow: 0 0 18px 3px rgba(95,224,255,.8); }
+  50%      { box-shadow: 0 0 36px 10px rgba(160,238,255,1); }
+}
+/* the bouncing "tap the field" cue, shown only while a card is selected */
+#deploy-hint { position: fixed; z-index: 46; pointer-events: none; display: none;
+  left: 50%; bottom: 158px; transform: translateX(-50%);
+  flex-direction: column; align-items: center; gap: 3px;
+  font-family: "Trebuchet MS","Segoe UI",sans-serif; }
+#deploy-hint .dh-arrow { font-size: 42px; line-height: 1; color: #5fe0ff;
+  text-shadow: 0 2px 6px rgba(0,0,0,.6); animation: dh-bounce .7s ease-in-out infinite; }
+#deploy-hint .dh-label { background: rgba(43,125,224,.94); color: #fff;
+  font-weight: 900; font-size: 15px; letter-spacing: .5px;
+  padding: 5px 14px; border-radius: 999px; border: 2px solid #aef0ff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+@keyframes dh-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-13px); } }
+@keyframes dh-bounce-h { 0%, 100% { transform: rotate(-90deg) translateY(0); }
+                         50% { transform: rotate(-90deg) translateY(-13px); } }
 /* LANDSCAPE: dock the HUD as a right-edge column so the field gets the full
    height (player castle was hiding under the bottom bar). */
 @media (orientation: landscape) {
@@ -64,7 +84,10 @@ function injectStyles() {
   #hud .card img { height: 100%; width: 100%; object-fit: contain; }
   #hud .card .cost { z-index: 1; }
   #hud .card .cost { width: 20px; height: 20px; font-size: 11px; top: -5px; left: -5px; }
-  #hud .card.sel { transform: translateX(-7px); }
+  #hud .card.sel { transform: translateX(-9px) scale(1.14); }
+  /* field is to the LEFT of the docked HUD: point the cue that way */
+  #deploy-hint { left: auto; right: 92px; bottom: auto; top: 50%; transform: translateY(-50%); }
+  #deploy-hint .dh-arrow { animation-name: dh-bounce-h; }
 }
 .hud-pop { position: fixed; z-index: 45; pointer-events: none;
   font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", "Trebuchet MS", cursive;
@@ -85,6 +108,7 @@ export function initHud() {
   injectStyles();
   document.getElementById('hud')?.remove();
   document.getElementById('hud-banner')?.remove();
+  document.getElementById('deploy-hint')?.remove();
 
   root = document.createElement('div');
   root.id = 'hud';
@@ -139,6 +163,10 @@ export function initHud() {
     });
   });
 
+  deployHint = document.createElement('div'); deployHint.id = 'deploy-hint';
+  deployHint.innerHTML = '<div class="dh-arrow">⬆</div><div class="dh-label">tap the field!</div>';
+  document.body.appendChild(deployHint);
+
   banner = document.createElement('div'); banner.id = 'hud-banner';
   bannerText = document.createElement('div'); bannerText.className = 'big';
   const sub = document.createElement('div'); sub.className = 'small';
@@ -158,6 +186,8 @@ export function updateHud(S) {
     el.classList.toggle('dim', (d.cost ?? d.val) > S.elixir);
     el.classList.toggle('sel', S.sel === i);
   });
+  // show the "tap the field" cue only while a card is picked
+  if (deployHint) deployHint.style.display = (!S.over && S.sel >= 0) ? 'flex' : 'none';
 
   // damage popups follow battle's S.pops
   const seen = new Set();
