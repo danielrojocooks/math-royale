@@ -1,6 +1,9 @@
 # Math Royale — Build Plan (agent execution guide)
 *Companion to CURRICULUM.md. Each epic below is sized for one focused session on a cheaper model (Sonnet for logic epics, Haiku acceptable for pure data-authoring epics). Do epics in order unless marked independent.*
 
+> **STATUS 2026-06-12 (see docs/HANDOFF.md for full state): E0 ✅ E1 ✅ E2 ✅ E3 ✅ (heavily redesigned in playtest: floating tap-to-count card, no pause, no charge modal) E4 ✅ E5 ✅ E10 ✅ (3D shipped EARLY — it is the renderer now; "renderer-agnostic" notes below are historical).**
+> **Remaining: the P0 math-reward redesign (HANDOFF.md), deploy+E9, E7, E8, E6 leftovers. The file maps in the original epic specs below are STALE for completed epics — trust CLAUDE.md's architecture section instead.**
+
 ## How to run an epic (instructions to the agent)
 1. Read `CLAUDE.md`, `docs/CURRICULUM.md`, and this file's epic section FIRST. The design rules in CURRICULUM.md override anything you'd rather do.
 2. Touch only the files listed in your epic. If you believe another file must change, stop and say so instead of changing it.
