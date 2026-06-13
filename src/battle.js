@@ -277,12 +277,19 @@ export function update(dt) {
   // foeMaxVal cap (from configureBattle) restricts which villains may spawn.
   S.foeTimer -= dt;
   if (S.foeTimer <= 0) {
+    // Only lanes whose foe princess still stands produce troops; once both are
+    // down the king is the lone, slower producer. Destroying towers cuts pressure.
+    const liveLanes = [0, 1].filter(l =>
+      S.towers.some(t => t.side === 'foe' && t.kind === 'prin' && t.lane === l && !t.dead));
+    const kingAlive = S.towers.some(t => t.side === 'foe' && t.kind === 'king' && !t.dead);
     const aff = FOES.filter(f => f.val <= S.foeElixir && f.val <= _cfg.foeMaxVal);
-    if (aff.length) {
+    if (aff.length && (liveLanes.length || kingAlive)) {
       const f = aff[Math.floor(Math.random() * aff.length)];
       S.foeElixir -= f.val;
-      mkTroop('foe', Math.floor(Math.random() * 2), 190, f.val, f.spr);
-      S.foeTimer = 1.8 + Math.random() * 1.8;   // spawns more often (difficulty)
+      const lane = liveLanes.length ? liveLanes[Math.floor(Math.random() * liveLanes.length)]
+                                    : Math.floor(Math.random() * 2);
+      mkTroop('foe', lane, 190, f.val, f.spr);
+      S.foeTimer = (liveLanes.length ? 1.8 : 3.6) + Math.random() * 1.8;   // king-only = slower
     } else S.foeTimer = .6;
   }
 

@@ -185,7 +185,9 @@ function openCard(reward) {
   // INPUT GRADUATES WITH MASTERY: T0/T1 = tap-to-count (production/counting stage),
   // T2 = pick the answer (recall stage). The engine demotes on misses, so a
   // guessed-wrong fact slides back to counting mode automatically.
-  const mode = tier >= 2 ? 'choose' : 'count';
+  // EXCEPTION: answers over 10 always use multiple-choice — tapping 11-19 times
+  // is impractical (and not the point at that range).
+  const mode = (tier >= 2 || f.sum > 10) ? 'choose' : 'count';
 
   cardState = { reward, profile, factId, ...f, mode, count: 0,
     firstTapAt: mode === 'choose' ? Date.now() : 0, idleTimer: null, tier, missed: false };
@@ -197,12 +199,9 @@ function openCard(reward) {
     cardEl.innerHTML = `
       <div class="reward">${rewardLabel}</div>
       <div class="eq">${f.a} + ${f.b} = ?</div>
-      <div class="dots"></div>
       <div class="count">tap!</div>
       <div class="pips"></div>
       <div class="hint"></div>`;
-    // T0: dots from the start; T1: after a miss; T2: never (CURRICULUM.md scaffold tiers)
-    if (tier === 0) renderDots(cardEl.querySelector('.dots'), f.a, f.b);
     cardEl.addEventListener('pointerdown', onTap);
   } else {
     cardEl.innerHTML = `
@@ -232,7 +231,8 @@ function openCard(reward) {
   positionCard();
 }
 
-// choose-mode miss: record it, wobble, keep the same card up for retry
+// choose-mode miss: record it; allow 2 guesses, then the card vanishes (no reward,
+// no nagging). Wrong answers still feed the mastery engine.
 function recordMissKeepCard() {
   const cs = cardState;
   if (!cs) return;
@@ -241,7 +241,15 @@ function recordMissKeepCard() {
     { thresholdMs: cs.profile.settings.fluencyMs });
   saveProfile(cs.profile);
   cs.missed = true;
+  cs.missCount = (cs.missCount || 0) + 1;
   cardEl.classList.remove('wobble'); void cardEl.offsetWidth; cardEl.classList.add('wobble');
+  if (cs.missCount >= 2) {                       // 2 wrong guesses -> float away
+    cooldownUntil = Date.now() + COOLDOWN_MS;
+    const el = cardEl; cardEl = null; cardState = null;
+    el.classList.add('solved');
+    setTimeout(() => el.remove(), 550);
+    return;
+  }
   cardEl.querySelector('.hint').textContent = 'try again!';
   setTimeout(() => { if (cardEl) cardEl.querySelector('.hint').textContent = ''; }, 1200);
 }
@@ -293,7 +301,6 @@ function resolve(correct) {
     cardEl.querySelector('.count').textContent = 'tap!';
     cardEl.querySelector('.pips').innerHTML = '';
     cardEl.querySelector('.hint').textContent = 'try again!';
-    if (cs.tier <= 1) renderDots(cardEl.querySelector('.dots'), cs.a, cs.b);  // T1 reveals dots on miss
     setTimeout(() => { if (cardEl) cardEl.querySelector('.hint').textContent = ''; }, 1200);
   }
 }
