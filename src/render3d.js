@@ -352,14 +352,36 @@ function decorate() {
   }
 }
 
+// archers standing on a tower (the visible defenders that fire the arrows)
+function buildArchers(t) {
+  const def = MODEL3D.unit_03;                  // Ranger w/ bow for everyone (tower archers)
+  const n = t.kind === 'king' ? 2 : 1;
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const obj = buildCharacter(def);
+    obj.scale.setScalar(0.55);
+    const ax = bx(t.x) + (n === 1 ? 0 : (k === 0 ? -0.55 : 0.55));
+    const ay = t.kind === 'king' ? 2.4 : 1.85;
+    obj.position.set(ax, ay, bz(t.y) + 0.15);
+    obj.rotation.y = t.side === 'you' ? Math.PI : 0;   // face downrange
+    const mixer = new THREE.AnimationMixer(obj);
+    if (assets.clips['Idle_A']) mixer.clipAction(assets.clips['Idle_A']).play();
+    scene.add(obj); out.push({ obj, mixer });
+  }
+  return out;
+}
+
 // ---- towers (built lazily once assets are ready; rebuilt when battle resets) ----
-function syncTowers(S) {
+function syncTowers(S, dt) {
   if (!ready) return;
   // detect reset: any tower object not in our map -> rebuild all
   let stale = towerVis.size !== S.towers.length;
   if (!stale) for (const t of S.towers) if (!towerVis.has(t)) { stale = true; break; }
   if (stale) {
-    for (const [, v] of towerVis) { scene.remove(v.obj); if (v.hpBadge) scene.remove(v.hpBadge); }
+    for (const [, v] of towerVis) {
+      scene.remove(v.obj); if (v.hpBadge) scene.remove(v.hpBadge);
+      v.archers?.forEach(a => scene.remove(a.obj));
+    }
     towerVis.clear();
     if (cannonObj) { scene.remove(cannonObj); cannonObj = null; }
     for (const t of S.towers) {
@@ -371,7 +393,7 @@ function syncTowers(S) {
       hpBadge.scale.setScalar(1.0);
       hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 5.6 : 3.6) : 2.9, bz(t.y));
       scene.add(hpBadge);
-      towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false });
+      towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false, archers: buildArchers(t) });
       // mount the cannon on YOUR king tower — only on cannon stages (dragon
       // stages have no cannon; the dragon flies in instead)
       if (t.side === 'you' && t.kind === 'king' && currentWeapon === 'cannon') {
@@ -395,9 +417,11 @@ function syncTowers(S) {
     if (t.dead && !v.dead) {
       scene.remove(v.hpBadge);
       v.dead = true;
+      v.archers?.forEach(a => scene.remove(a.obj)); v.archers = [];   // defenders fall with the tower
       v.obj.traverse(n => { if (n.isMesh) { n.material = n.material.clone(); n.material.color.multiplyScalar(0.35); } });
       v.obj.scale.multiplyScalar(0.8); v.obj.rotation.z = 0.12;
     }
+    if (!t.dead && v.archers) for (const a of v.archers) a.mixer.update(dt || 0);
     // hit flash
     if (!t.dead && t.flash > 0) {
       v.obj.traverse(n => { if (n.isMesh && n.material.emissive) n.material.emissive.setRGB(t.flash * 1.6, 0, 0); });
@@ -871,7 +895,7 @@ export function fireWeapon(tx, tz, onImpact) {
 // ---- public API (matches render2d.js) ----
 export function render(S) {
   const dt = Math.min(0.05, clock.getDelta());
-  syncTowers(S);
+  syncTowers(S, dt);
   syncTroops(S, dt);
   syncParts(S, dt);
   syncTentacles(S);

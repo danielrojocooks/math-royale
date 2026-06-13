@@ -204,7 +204,8 @@ function towerFire(dt) {
       if (d < bd) { bd = d; best = t; }
     }
     if (!best) { tw.atkcd = 0.3; continue; }            // scan faster when nothing in range
-    tw.atkcd = tw.kind === 'king' ? 0.7 : 0.95;
+    const ramp = 1 + Math.min(1.0, S.T / 100);          // archers speed up as the match drags on
+    tw.atkcd = (tw.kind === 'king' ? 0.7 : 0.95) / ramp;
     // arrow streak from tower to target
     for (let i = 1; i <= 5; i++) {
       const f = i / 6;
