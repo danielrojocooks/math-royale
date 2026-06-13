@@ -329,11 +329,11 @@ export function update(dt) {
       const lane = liveLanes.length ? liveLanes[Math.floor(Math.random() * liveLanes.length)]
                                     : Math.floor(Math.random() * 2);
       mkTroop('foe', lane, 190, f.val, f.spr);
-      // Sparser spawns so it's waves, not a steady stream — much slower on early
+      // Steady but not a flood: a few seconds between spawns, a bit slower on early
       // arenas (ramps to normal later). King-only production is slower still.
       const lvl = Math.min(6, _cfg.level);
-      const gap = (liveLanes.length ? 2.8 : 4.6) * (1 + (6 - lvl) * 0.28);
-      S.foeTimer = gap + Math.random() * 2;
+      const gap = (liveLanes.length ? 2.0 : 3.6) * (1 + (6 - lvl) * 0.12);
+      S.foeTimer = gap + Math.random() * 1.5;
     } else S.foeTimer = .6;
   }
 
