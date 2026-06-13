@@ -607,7 +607,7 @@ function updateCannon(dt) {
 // wings actually flap. Authored at ~12-unit wingspan, feet at origin; we scale and
 // lift it. Fire is still a particle jet (model has no breath clip). Tunable:
 const DRAGON_SCALE = 0.6;         // ~12.4 model units wide -> ~7.4 world units
-const DRAGON_YAW = Math.PI;       // model nose is at local -Z; +PI makes it LEAD travel
+const DRAGON_YAW = 0;             // model nose is at local +Z; aligns nose with travel
 const DRAGON_ALT = 7.0;           // cruise altitude over the field
 const DRAGON_CENTER = [0, -1.36, 0];  // lift feet-at-origin model so its body centers
 const DRAGON_HEAD = 2.2;          // world dist from body center to mouth (fire origin)
