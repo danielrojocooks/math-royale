@@ -72,6 +72,7 @@ function rebuildTheme() {
 let towersBuilt = false, towerVis = new Map(), troopVis = new Map();
 let partVis = new Map(), matCache = {};
 let cannonObj = null, cannonProjectiles = [];   // catapult on your king + in-flight shots
+let dragons = [];                                // active fly-in dragons (fire-breath on solve)
 
 export function initRender(canvas) {
   ren = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -171,6 +172,9 @@ async function loadAssets() {
     Promise.allSettled(PROPS_GLB.map(n => loadGlb(loader, 'assets/game/env/' + n + '.gltf.glb'))),
     Promise.allSettled(WEAPONS.map(n => loadGlb(loader, 'assets/game/weapons/' + n + '.gltf')))
       .then(rs => { assets.weapons = {}; rs.forEach((r, i) => { if (r.status === 'fulfilled') assets.weapons[WEAPONS[i]] = r.value.scene; }); }),
+    // Dragon (different maker; optional — game runs fine if it fails to load)
+    Promise.allSettled([loadGlb(loader, 'assets/game/dragon.glb')])
+      .then(rs => { assets.dragon = rs[0].status === 'fulfilled' ? rs[0].value.scene : null; }),
   ]);
   for (const lib of libs) for (const c of lib.animations) assets.clips[c.name] = c;
   names.forEach((n, i) => { assets.chars[n] = chars[i].scene; });
@@ -595,6 +599,75 @@ function updateCannon(dt) {
   }
 }
 
+// ---- fly-in dragon: swoops across, breathes fire on the target (solve reward) ----
+// The model is from a different maker (no animation clips, ~25x bigger, off-origin),
+// so we normalize scale/position and fake life procedurally. Tunable constants:
+const DRAGON_SCALE = 0.13;        // wingspan ~52 model units -> ~6.8 world units
+const DRAGON_YAW = Math.PI / 2;   // base facing so the nose points along travel (tune)
+const DRAGON_ALT = 7.0;           // cruise altitude over the field
+const DRAGON_CENTER = [0, -8.69, 7.63];  // recenter offset from bbox inspection
+
+function makeDragon() {
+  const inner = SkeletonUtils.clone(assets.dragon);
+  inner.traverse(n => { if (n.isMesh) n.castShadow = true; });
+  inner.position.set(DRAGON_CENTER[0], DRAGON_CENTER[1], DRAGON_CENTER[2]);
+  const g = new THREE.Group();
+  g.add(inner);
+  g.scale.setScalar(DRAGON_SCALE);
+  return g;
+}
+
+function breatheFire(from, tx, tz) {
+  const to = new THREE.Vector3(tx, 0.6, tz);
+  const dir = to.clone().sub(from).normalize();
+  for (let i = 0; i < 24; i++) {
+    const sp = softSprite(i % 2 ? 0xff7a1e : 0xffcf4d);
+    sp.scale.setScalar(0.4 + Math.random() * 0.55);
+    sp.position.copy(from);
+    scene.add(sp);
+    const s = 6 + Math.random() * 5, spr = 1.8;
+    localParts.push({ sp,
+      vx: dir.x * s + (Math.random() - 0.5) * spr,
+      vy: dir.y * s + (Math.random() - 0.5) * spr,
+      vz: dir.z * s + (Math.random() - 0.5) * spr,
+      life: 0.5 + Math.random() * 0.3, maxlife: 0.8, own: true });
+  }
+}
+
+/** fireDragon — a dragon swoops in from a random side, breathes fire on the target
+ *  (battle coords) at mid-pass, and flies off. onImpact runs with the fire hit
+ *  (same kill as the cannon). Falls back to onImpact if the model is unavailable. */
+export function fireDragon(tx, tz, onImpact) {
+  if (!ready || !assets.dragon) { if (onImpact) onImpact(); return; }
+  const target = { x: bx(tx), z: bz(tz) };
+  const dir = Math.random() < 0.5 ? 1 : -1;     // L->R or R->L
+  const fromX = -dir * 15, toX = dir * 15;
+  const obj = makeDragon();
+  const z = target.z - 1.2;
+  obj.position.set(fromX, DRAGON_ALT, z);
+  scene.add(obj);
+  dragons.push({ obj, t: 0, dur: 1.9, fromX, toX, z, dir, target, fired: false, onImpact });
+}
+
+function updateDragons(dt) {
+  for (let i = dragons.length - 1; i >= 0; i--) {
+    const d = dragons[i];
+    d.t += dt;
+    const f = d.t / d.dur;
+    if (f >= 1) { scene.remove(d.obj); dragons.splice(i, 1); continue; }
+    d.obj.position.x = d.fromX + (d.toX - d.fromX) * f;
+    d.obj.position.y = DRAGON_ALT - Math.sin(f * Math.PI) * 1.6;   // dip toward the field mid-pass
+    d.obj.rotation.y = d.dir > 0 ? DRAGON_YAW : DRAGON_YAW + Math.PI;
+    d.obj.rotation.z = Math.sin(d.t * 7) * 0.07;                   // subtle bank/wingbeat life
+    if (!d.fired && f >= 0.5) {
+      d.fired = true;
+      breatheFire(d.obj.position.clone(), d.target.x, d.target.z);
+      bigBoom(new THREE.Vector3(d.target.x, 0.6, d.target.z));
+      if (d.onImpact) d.onImpact();
+    }
+  }
+}
+
 // ---- public API (matches render2d.js) ----
 export function render(S) {
   const dt = Math.min(0.05, clock.getDelta());
@@ -602,6 +675,7 @@ export function render(S) {
   syncTroops(S, dt);
   syncParts(S, dt);
   updateCannon(dt);
+  updateDragons(dt);
   // camera shake
   if (S.shake > 0) {
     cam.position.x += (Math.random() - .5) * S.shake * 0.5;
