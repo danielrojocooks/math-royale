@@ -4,7 +4,7 @@
 // Card list comes from battle.S.deck (set dynamically) — not the static DECK.
 import { PANEL_Y } from '../data/units.js';
 import * as battle from './battle.js';
-import { worldToScreen, getPortraits } from './render3d.js';
+import { worldToScreen, toWorld, getPortraits } from './render3d.js';
 
 let root, elixCells, elixNum, cardEls = [], banner, bannerText, deployHint;
 const popEls = new Map();
@@ -51,6 +51,11 @@ function injectStyles() {
   0%, 100% { box-shadow: 0 0 18px 3px rgba(95,224,255,.8); }
   50%      { box-shadow: 0 0 36px 10px rgba(160,238,255,1); }
 }
+#hud .card { touch-action: none; }   /* needed for slide-to-deploy on touch */
+#hud-drag-ghost { position: fixed; z-index: 70; width: 72px; height: 72px;
+  object-fit: contain; pointer-events: none;
+  transform: translate(-50%, -70%) scale(1.1);
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.5)); opacity: .92; }
 /* the bouncing "tap the field" cue, shown only while a card is selected */
 #deploy-hint { position: fixed; z-index: 46; pointer-events: none; display: none;
   left: 50%; bottom: 158px; transform: translateX(-50%);
@@ -138,13 +143,38 @@ export function initHud() {
     img.onerror = () => { img.style.display = 'none'; };
     el.innerHTML = `<span class="cost">${d.cost ?? d.val}</span>`;
     el.appendChild(img);
-    // Tap-to-deploy: tap a card to SELECT it (it lifts), then tap anywhere on the
-    // field to drop (input.js -> battle.tryDeploy). Two clean taps, no drag — the
-    // tablet's hover-drag was unreliable, and any field spot is now a valid drop.
+    // Slide-to-deploy: press a card and slide up to a lane (left/right), release to
+    // deploy at that lane's tower. A short tap just selects (tap-card-then-tap-lane
+    // still works). The release X picks the lane; the troop spawns at your tower.
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
       if (battle.S.over) return;
-      battle.trySelectCard(i);
+      if (!battle.trySelectCard(i)) return;
+      el.setPointerCapture(e.pointerId);
+      const sx = e.clientX, sy = e.clientY;
+      let ghost = null;
+      const move = (ev) => {
+        if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 12) {
+          ghost = document.createElement('img');
+          ghost.id = 'hud-drag-ghost';
+          ghost.src = el.querySelector('img')?.src || '';
+          document.body.appendChild(ghost);
+        }
+        if (ghost) { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; }
+      };
+      const up = (ev) => {
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', up);
+        el.removeEventListener('pointercancel', up);
+        if (ghost) {
+          ghost.remove();
+          const w = toWorld(ev.clientX, ev.clientY);
+          battle.tryDeploy(w.x, w.y);   // release on the field deploys at that lane's tower
+        }
+      };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
     });
     cards.appendChild(el); cardEls.push(el);
   });

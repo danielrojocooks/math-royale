@@ -62,8 +62,8 @@ export function reset() {
   // Enemy pushed back toward the top edge + player front nudged back to lengthen
   // the contested middle (longer matches).
   S.towers = [
-    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 48),
-    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 48),
+    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 60),
+    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 60),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
@@ -224,28 +224,27 @@ export function trySelectCard(i) {
   S.shake = .12; return false;
 }
 export function tryDeploy(x, y) {
-  // Deploy ANYWHERE on the field (kid-friendly: no dead spots, no your-half rule).
-  // The tap lands the troop where you tapped; x snaps to the nearest lane so the
-  // lane-based combat still works, y is free across the whole board.
+  // Deploy at YOUR tower for the chosen lane — troops always emerge from your
+  // side (not anywhere downfield). The release X picks the lane (left/right);
+  // the unit spawns just in front of that lane's tower and marches out.
   if (S.sel < 0) return false;
   const d = _activeDeck[S.sel];
   const cost = d.cost ?? d.val;
   if (cost > S.elixir) return false;
   S.elixir -= cost;
   const lane = x < 380 ? 0 : 1;
-  const dy = Math.max(FIELD_TOP, Math.min(FIELD_BOT, y));
+  const tw = S.towers.find(t => t.side === 'you' && t.kind === 'prin' && t.lane === lane && !t.dead)
+          || S.towers.find(t => t.side === 'you' && t.kind === 'king' && !t.dead);
+  const dy = tw ? tw.y - 28 : 880;     // just in front of your tower
   const n = d.count ?? 1;
   // squads fan out in a small formation (offsets are visual; lane combat unchanged)
   for (let i = 0; i < n; i++) {
     const xoff = (i - (n - 1) / 2) * 30;
-    const yoff = (i % 2) * 34;
-    mkTroop('you', lane, Math.min(FIELD_BOT, dy + yoff), d.val, d.spr, xoff);
+    const yoff = (i % 2) * 28;
+    mkTroop('you', lane, dy + yoff, d.val, d.spr, xoff);
   }
   S.sel = -1; return true;
 }
-// Deploy band = the whole playable field (just below the enemy castle line down
-// to just above your king), so any tap is a valid drop.
-const FIELD_TOP = 150, FIELD_BOT = 940;
 
 // ---- gate exports ----
 
