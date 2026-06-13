@@ -1,0 +1,11 @@
+{
+  "name": "Math Royale",
+  "short_name": "Math Royale",
+  "description": "A Clash-Royale-style math game.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0e0a1c",
+  "theme_color": "#0e0a1c"
+}

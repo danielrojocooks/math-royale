@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Math Royale</title>
+<meta name="theme-color" content="#0e0a1c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
 <style>
   html,body{margin:0;height:100%;background:#0e0a1c;overflow:hidden;touch-action:none;
             font-family:"Trebuchet MS","Segoe UI",sans-serif;}
@@ -12,6 +17,24 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<script>
+// Go true-fullscreen on the first tap (hides the browser address/status bars).
+// Skipped when already launched as an installed app. One-shot; the same tap
+// still reaches the game.
+(function () {
+  var installed = (window.matchMedia &&
+      (matchMedia('(display-mode: fullscreen)').matches ||
+       matchMedia('(display-mode: standalone)').matches)) || navigator.standalone;
+  if (installed) return;
+  function goFull() {
+    window.removeEventListener('pointerdown', goFull);
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req && !document.fullscreenElement) { try { req.call(el); } catch (e) {} }
+  }
+  window.addEventListener('pointerdown', goFull, { passive: true });
+})();
+</script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
