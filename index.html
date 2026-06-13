@@ -18,21 +18,22 @@
 <body>
 <canvas id="c"></canvas>
 <script>
-// Go true-fullscreen on the first tap (hides the browser address/status bars).
-// Skipped when already launched as an installed app. One-shot; the same tap
-// still reaches the game.
+// Go true-fullscreen on tap (hides the browser address/status bars). Runs in the
+// CAPTURE phase so the game's own stopPropagation() handlers can't swallow it,
+// and re-attempts on each tap until it actually takes. Skipped once installed.
 (function () {
   var installed = (window.matchMedia &&
       (matchMedia('(display-mode: fullscreen)').matches ||
        matchMedia('(display-mode: standalone)').matches)) || navigator.standalone;
   if (installed) return;
   function goFull() {
-    window.removeEventListener('pointerdown', goFull);
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
     var el = document.documentElement;
     var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-    if (req && !document.fullscreenElement) { try { req.call(el); } catch (e) {} }
+    if (req) { try { req.call(el); } catch (e) {} }
   }
-  window.addEventListener('pointerdown', goFull, { passive: true });
+  window.addEventListener('pointerdown', goFull, { capture: true, passive: true });
+  window.addEventListener('touchstart', goFull, { capture: true, passive: true });
 })();
 </script>
 <script type="importmap">
