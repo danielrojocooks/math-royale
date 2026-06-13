@@ -49,7 +49,7 @@ const TENT_RETRACT = 0.5;  // sink back under
 const TENT_EMERGE = 0.22;  // how fast it rises during the strike
 
 function tower(side, kind, x, y, lane, hp) {
-  return { side, kind, x, y, lane, hp, maxhp: hp, flash: 0, dead: false };
+  return { side, kind, x, y, lane, hp, maxhp: hp, flash: 0, dead: false, atkcd: Math.random() * 0.6 };
 }
 
 export function reset() {
@@ -60,8 +60,8 @@ export function reset() {
   // Enemy pushed back toward the top edge + player front nudged back to lengthen
   // the contested middle (longer matches).
   S.towers = [
-    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 24),
-    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 24),
+    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 30),
+    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 30),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
@@ -187,6 +187,35 @@ function updateTentacles(dt) {
     }
   }
   S.tentacles = S.tentacles.filter(te => !te.done);
+}
+
+// ---- tower offense: towers shoot the nearest enemy in range (CR-style defense) ----
+// Arrows chip a troop's value (size = magnitude shrinks it); king shoots harder.
+function towerFire(dt) {
+  for (const tw of S.towers) {
+    if (tw.dead) continue;
+    tw.atkcd -= dt;
+    if (tw.atkcd > 0) continue;
+    const range = tw.kind === 'king' ? 215 : 175;
+    let best = null, bd = range;
+    for (const t of S.troops) {
+      if (t.dead || t.side === tw.side || t.grabbed) continue;
+      const d = Math.hypot(t.x - tw.x, t.y - tw.y);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) { tw.atkcd = 0.3; continue; }            // scan faster when nothing in range
+    tw.atkcd = tw.kind === 'king' ? 0.7 : 0.95;
+    // arrow streak from tower to target
+    for (let i = 1; i <= 5; i++) {
+      const f = i / 6;
+      S.parts.push({ x: tw.x + (best.x - tw.x) * f, y: tw.y + (best.y - tw.y) * f,
+        vx: 0, vy: 0, life: .16, color: '#ffe9b0', r: 3 });
+    }
+    best.val -= 1; best.flash = .2; best.hit = .2;
+    popup(best.x, best.y - 30, '-1', tw.side === 'you' ? '#bff' : '#fbb');
+    burst(best.x, best.y, '#fff', 4, 120);
+    if (best.val <= 0) kill(best);
+  }
 }
 
 // ---- player actions (called by input.js) ----
@@ -396,6 +425,8 @@ export function update(dt) {
       }
     }
   }
+
+  towerFire(dt);   // towers shoot nearby enemies
 
   decay(dt);
   S.troops = S.troops.filter(t => !(t.dead && t.dying <= 0));
