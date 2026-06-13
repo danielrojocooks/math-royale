@@ -17,16 +17,18 @@ export function setDeck(cards) {
 // ---- arena configuration (set by arenas.js via configureBattle before reset()) ----
 // foeMaxVal: upper bound on villain val the AI may spawn (default = uncapped).
 // bossSpawn: { spr, val } to drop on the foe side 1s after match start, or null.
-let _cfg = { foeMaxVal: Infinity, bossSpawn: null };
+let _cfg = { foeMaxVal: Infinity, bossSpawn: null, tentacle: null };
 
 /**
  * configureBattle — called by the arena system before reset() to set match parameters.
- * @param {{ foeMaxVal?: number, bossSpawn?: {spr:string, val:number}|null }} opts
+ * tentacle: { period, reach } river hazard intensity, or null to disable.
+ * @param {{ foeMaxVal?: number, bossSpawn?: {spr:string, val:number}|null, tentacle?: {period:number,reach:number}|null }} opts
  */
-export function configureBattle({ foeMaxVal, bossSpawn } = {}) {
+export function configureBattle({ foeMaxVal, bossSpawn, tentacle } = {}) {
   _cfg = {
     foeMaxVal: foeMaxVal ?? Infinity,
     bossSpawn: bossSpawn ?? null,
+    tentacle: tentacle ?? null,
   };
 }
 
@@ -37,7 +39,14 @@ export const S = {
   sel: -1, shake: 0, over: null, T: 0,
   paused: false,  // set true while a gate modal is open; update() skips sim
   deck: DEFAULT_DECK,  // mirrors _activeDeck; renderers/HUD read this
+  tentacles: [], tentTimer: 0,  // river hazard (configureBattle.tentacle)
 };
+
+// Tentacle hazard phase timings (seconds)
+const TENT_WARN = 0.8;     // telegraph ripple before it strikes
+const TENT_STRIKE = 0.6;   // erupt + pull the grabbed unit in
+const TENT_RETRACT = 0.5;  // sink back under
+const TENT_EMERGE = 0.22;  // how fast it rises during the strike
 
 function tower(side, kind, x, y, lane, hp) {
   return { side, kind, x, y, lane, hp, maxhp: hp, flash: 0, dead: false };
@@ -57,6 +66,7 @@ export function reset() {
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
   S.sel = -1; S.shake = 0; S.over = null; S.T = 0; S.paused = false;
+  S.tentacles = []; S.tentTimer = _cfg.tentacle ? 2.5 + Math.random() * 2 : 1e9;
 
   // ── Boss spawn: drop the boss unit on the foe side ~1s after match start.
   if (_cfg.bossSpawn) {
@@ -106,7 +116,7 @@ function mkTroop(side, lane, y, val, spr, xoff) {
     side, lane, x: LANE[lane] + (xoff || 0), y, val, maxval: val, spr,
     pop: 0, flash: 0, hit: 0, atk: 0, atkcd: .3, struck: false,
     walk: Math.random() * 6.28, dust: 0, moving: false, dead: false, dying: 0,
-    duelWith: null, duelT: 0, dueling: false,
+    duelWith: null, duelT: 0, dueling: false, grabbed: false,
   });
   burst(LANE[lane], y, side === 'you' ? '#7ec8ff' : '#ff9a9a', 12, 150);
   for (let i = 0; i < 8; i++) {
@@ -119,6 +129,62 @@ function oppTower(side, lane) {
   const o = side === 'you' ? 'foe' : 'you';
   return S.towers.find(t => !t.dead && t.side === o && t.kind === 'prin' && t.lane === lane)
       || S.towers.find(t => !t.dead && t.side === o && t.kind === 'king') || null;
+}
+
+// ---- river tentacle hazard ----
+// A tentacle telegraphs (ripple), erupts, and drags the nearest unit under.
+// Neutral: grabs whoever is closest (yours OR the foe's). Intensity scales by arena.
+function spawnTentacle() {
+  const x = 130 + Math.random() * 500;                   // within the field width
+  const y = RIVER_T + Math.random() * (RIVER_B - RIVER_T);
+  S.tentacles.push({ x, y, phase: 'warn', t: 0, rise: 0, grabbed: null, done: false });
+}
+function dragUnder(tr) {
+  if (tr.dead) return;
+  tr.dead = true; tr.dying = .16; tr.flash = 0; tr.grabbed = false;
+  // blue water splash (not the red death gore)
+  burst(tr.x, tr.y, '#7ec8ff', 16, 170); ring(tr.x, tr.y, '#bfe8ff'); splat(tr.x, tr.y, '#2f6fae');
+  S.shake = Math.max(S.shake, .26);
+}
+function updateTentacles(dt) {
+  const cfg = _cfg.tentacle;
+  S.tentTimer -= dt;
+  if (S.tentTimer <= 0) { spawnTentacle(); S.tentTimer = cfg.period * (0.7 + Math.random() * 0.6); }
+  for (const te of S.tentacles) {
+    te.t += dt;
+    if (te.phase === 'warn') {
+      te.rise = 0;
+      if (te.t >= TENT_WARN) {
+        te.phase = 'strike'; te.t = 0;
+        // grab the nearest living, ungrabbed unit within reach
+        let best = null, bd = cfg.reach;
+        for (const tr of S.troops) {
+          if (tr.dead || tr.grabbed) continue;
+          const d = Math.hypot(tr.x - te.x, tr.y - te.y);
+          if (d < bd) { bd = d; best = tr; }
+        }
+        if (best) {
+          te.grabbed = best; best.grabbed = true;
+          if (best.duelWith) { best.duelWith.duelWith = null; best.duelWith.dueling = false; }
+          best.duelWith = null; best.dueling = false;
+        }
+      }
+    } else if (te.phase === 'strike') {
+      te.rise = Math.min(1, te.t / TENT_EMERGE);
+      if (te.grabbed && !te.grabbed.dead) {
+        const tr = te.grabbed, k = Math.min(1, dt * 5);
+        tr.x += (te.x - tr.x) * k; tr.y += (te.y - tr.y) * k;     // pull toward the tentacle
+      }
+      if (te.t >= TENT_STRIKE) {
+        if (te.grabbed && !te.grabbed.dead) dragUnder(te.grabbed);
+        te.phase = 'retract'; te.t = 0;
+      }
+    } else {                                                       // retract
+      te.rise = Math.max(0, 1 - te.t / TENT_RETRACT);
+      if (te.t >= TENT_RETRACT) te.done = true;
+    }
+  }
+  S.tentacles = S.tentacles.filter(te => !te.done);
 }
 
 // ---- player actions (called by input.js) ----
@@ -218,6 +284,9 @@ export function update(dt) {
     } else S.foeTimer = .6;
   }
 
+  // river tentacle hazard (telegraph -> grab -> drag under)
+  if (_cfg.tentacle) updateTentacles(dt);
+
   // tower hit-flash decay (was never decremented — towers stayed red forever)
   for (const tw of S.towers) if (tw.flash > 0) tw.flash -= dt;
 
@@ -226,6 +295,7 @@ export function update(dt) {
     if (t.flash > 0) t.flash -= dt;
     if (t.hit > 0) t.hit -= dt;
     if (t.dead) { t.dying -= dt; continue; }
+    if (t.grabbed) continue;                   // tentacle controls this unit's position
     if (t.pop < 1) t.pop = Math.min(1, t.pop + dt * 5);
     // Dueling: locked with an opponent — stand and trade blows until the timer
     // resolves the math (see combat pass). Partner died elsewhere? Resume.
@@ -291,7 +361,7 @@ export function update(dt) {
   // troop-vs-troop combat: meeting troops LOCK INTO A DUEL (trade animated blows
   // ~1.7s), THEN the math resolves: subtraction; equal numbers annihilate.
   for (let i = 0; i < S.troops.length; i++) {
-    const a = S.troops[i]; if (a.dead || a.side !== 'you') continue;
+    const a = S.troops[i]; if (a.dead || a.side !== 'you' || a.grabbed) continue;
     // resolve an expired duel
     if (a.duelWith && !a.duelWith.dead) {
       a.duelT -= dt;
@@ -307,7 +377,7 @@ export function update(dt) {
     }
     // pair up free troops that meet
     for (let j = 0; j < S.troops.length; j++) {
-      const b = S.troops[j]; if (b.dead || b.side !== 'foe' || b.lane !== a.lane || b.duelWith) continue;
+      const b = S.troops[j]; if (b.dead || b.side !== 'foe' || b.lane !== a.lane || b.duelWith || b.grabbed) continue;
       if (Math.abs(a.y - b.y) < 48) {
         a.duelWith = b; b.duelWith = a;
         a.duelT = 1.7;

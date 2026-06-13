@@ -74,6 +74,7 @@ let partVis = new Map(), matCache = {};
 let cannonObj = null, cannonProjectiles = [];   // cannon on your king + in-flight shots
 let dragons = [];                                // active fly-in dragons (fire-breath on solve)
 let currentWeapon = 'cannon';                    // per-arena: 'cannon' or 'dragon' (set by main.js)
+let tentVis = new Map();                          // river tentacle hazard visuals
 
 export function initRender(canvas) {
   ren = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -738,6 +739,64 @@ function updateDragons(dt) {
   }
 }
 
+// ---- river tentacle hazard: ripple telegraph -> rising curled tentacle ----
+function buildTentacle() {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0.15, 0.9, 0.10),
+    new THREE.Vector3(-0.10, 1.7, 0.25),
+    new THREE.Vector3(0.35, 2.3, 0.15),
+    new THREE.Vector3(0.75, 2.55, -0.05),    // curl over at the tip
+  ]);
+  const geo = new THREE.TubeGeometry(curve, 22, 0.27, 8, false);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x356f5f });
+  const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true;
+  const g = new THREE.Group(); g.add(mesh);
+  return g;
+}
+function makeRipple() {
+  const m = new THREE.Mesh(
+    new THREE.RingGeometry(0.35, 0.62, 28),
+    new THREE.MeshBasicMaterial({ color: 0xcdeeff, transparent: true, opacity: 0.7,
+      side: THREE.DoubleSide, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.06;
+  return m;
+}
+function syncTentacles(S) {
+  if (!ready) return;
+  const seen = new Set();
+  for (const te of S.tentacles) {
+    seen.add(te);
+    let v = tentVis.get(te);
+    if (!v) {
+      const group = new THREE.Group();
+      group.position.set(bx(te.x), 0, bz(te.y));
+      group.rotation.y = (Math.sin(te.x * 12.9) * 43758.5) % 6.28;   // varied facing
+      const ring = makeRipple(), tent = buildTentacle();
+      tent.visible = false;
+      group.add(ring); group.add(tent); scene.add(group);
+      v = { group, ring, tent }; tentVis.set(te, v);
+    }
+    if (te.phase === 'warn') {
+      v.ring.visible = true; v.tent.visible = false;
+      v.ring.scale.setScalar(0.7 + te.t * 1.4);
+      v.ring.material.opacity = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(te.t * 16));
+    } else {
+      v.tent.visible = true;
+      v.tent.scale.set(1, Math.max(0.04, te.rise), 1);     // rise out of the water
+      v.ring.visible = te.phase === 'strike';
+      v.ring.material.opacity = 0.3 * te.rise;
+      v.ring.scale.setScalar(1.5);
+    }
+  }
+  for (const [te, v] of tentVis) {
+    if (!seen.has(te)) {
+      v.group.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) n.material.dispose(); });
+      scene.remove(v.group); tentVis.delete(te);
+    }
+  }
+}
+
 /** setWeapon — choose this arena's solve weapon ('cannon' or 'dragon'). Call before
  *  the match resets so syncTowers mounts (or skips) the cannon accordingly. */
 export function setWeapon(w) { currentWeapon = w === 'dragon' ? 'dragon' : 'cannon'; }
@@ -754,6 +813,7 @@ export function render(S) {
   syncTowers(S);
   syncTroops(S, dt);
   syncParts(S, dt);
+  syncTentacles(S);
   updateCannon(dt);
   updateDragons(dt);
   // camera shake
