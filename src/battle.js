@@ -333,10 +333,10 @@ export function update(dt) {
       const lane = liveLanes.length ? liveLanes[Math.floor(Math.random() * liveLanes.length)]
                                     : Math.floor(Math.random() * 2);
       mkTroop('foe', lane, 190, f.val, f.spr);
-      // Steady trickle (not a flood): a couple seconds between spawns, slightly
+      // Steady trickle (not a flood): a few seconds between spawns, slightly
       // slower on early arenas. King-only production is slower still.
-      const gap = (liveLanes.length ? 1.5 : 2.7) * (1 + (6 - lvl) * 0.12);
-      S.foeTimer = gap + Math.random() * 1.2;
+      const gap = (liveLanes.length ? 1.95 : 3.5) * (1 + (6 - lvl) * 0.12);
+      S.foeTimer = gap + Math.random() * 1.55;
     } else S.foeTimer = .6;
   }
 
