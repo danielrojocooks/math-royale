@@ -47,10 +47,12 @@ export function reset() {
   // Sync the public deck snapshot so renderers always see the current deck.
   S.deck = _activeDeck;
 
-  // Castles spread further apart -> longer marches, more board to play
+  // Castles spread further apart -> longer marches, more board to play.
+  // Enemy pushed back toward the top edge + player front nudged back to lengthen
+  // the contested middle (longer matches).
   S.towers = [
-    tower('foe', 'prin', LANE[0], 205, 0, 14), tower('foe', 'prin', LANE[1], 205, 1, 14), tower('foe', 'king', 380, 65, -1, 24),
-    tower('you', 'prin', LANE[0], 750, 0, 14), tower('you', 'prin', LANE[1], 750, 1, 14), tower('you', 'king', 380, 915, -1, 24),
+    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 24),
+    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 24),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
@@ -61,7 +63,7 @@ export function reset() {
     const { spr, val } = _cfg.bossSpawn;
     setTimeout(() => {
       if (S.over) return; // match may have already ended (edge case)
-      mkTroop('foe', Math.floor(Math.random() * 2), 250, val, spr);
+      mkTroop('foe', Math.floor(Math.random() * 2), 190, val, spr);
     }, 1000);
   }
 }
@@ -211,7 +213,7 @@ export function update(dt) {
     if (aff.length) {
       const f = aff[Math.floor(Math.random() * aff.length)];
       S.foeElixir -= f.val;
-      mkTroop('foe', Math.floor(Math.random() * 2), 250, f.val, f.spr);
+      mkTroop('foe', Math.floor(Math.random() * 2), 190, f.val, f.spr);
       S.foeTimer = 1.8 + Math.random() * 1.8;   // spawns more often (difficulty)
     } else S.foeTimer = .6;
   }
