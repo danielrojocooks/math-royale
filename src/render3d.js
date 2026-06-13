@@ -434,6 +434,27 @@ function mat(color) {
   if (!matCache[color]) matCache[color] = new THREE.SpriteMaterial({ color, depthTest: false });
   return matCache[color];
 }
+// Soft round glow texture (radial gradient) so explosion puffs aren't hard
+// squares. Additive blending makes overlapping puffs read as fire.
+let softTex = null;
+function getSoftTex() {
+  if (softTex) return softTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.35, 'rgba(255,255,255,0.7)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  softTex = new THREE.CanvasTexture(c);
+  return softTex;
+}
+// own per-sprite material (its own opacity for independent fade); dispose on death
+function softSprite(color) {
+  const m = new THREE.SpriteMaterial({ map: getSoftTex(), color, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+  return new THREE.Sprite(m);
+}
 const localParts = [];
 function kablooie(pos, color) {
   for (let i = 0; i < 16; i++) {
@@ -465,11 +486,12 @@ function syncParts(S, dt) {
   for (let i = localParts.length - 1; i >= 0; i--) {
     const q = localParts[i];
     q.life -= dt;
-    if (q.life <= 0) { scene.remove(q.sp); localParts.splice(i, 1); continue; }
-    q.vy -= 9 * dt;
+    if (q.life <= 0) { scene.remove(q.sp); if (q.own) q.sp.material.dispose(); localParts.splice(i, 1); continue; }
+    if (q.grow) q.sp.scale.addScalar(q.grow * dt);     // expanding flash core
+    q.vy -= (q.grow ? 0 : 9) * dt;                      // flash doesn't fall
     q.sp.position.x += q.vx * dt; q.sp.position.y += q.vy * dt; q.sp.position.z += q.vz * dt;
     if (q.sp.position.y < 0.05) q.sp.position.y = 0.05;
-    q.sp.material.opacity = Math.min(1, q.life * 2);
+    q.sp.material.opacity = Math.min(1, q.life * (q.maxlife ? 1 / q.maxlife : 2));
   }
 }
 
@@ -504,13 +526,19 @@ function buildCannon() {
 
 // a fat, fiery burst — the math payoff has to out-spectacle the battle
 function bigBoom(pos) {
+  // bright flash core that expands and fades fast
+  const flash = softSprite(0xffe7b0); flash.scale.setScalar(1.4);
+  flash.position.copy(pos); flash.position.y += 0.85; scene.add(flash);
+  localParts.push({ sp: flash, vx: 0, vy: 0, vz: 0, life: 0.26, maxlife: 0.26, grow: 8, own: true });
+  // soft fiery puffs flung outward
   for (let i = 0; i < 40; i++) {
-    const sp = new THREE.Sprite(mat(i % 4 ? (i % 2 ? 0xff8a1e : 0xffcf4d) : 0xffffff));
-    sp.scale.setScalar(0.32 + Math.random() * 0.5);
+    const sp = softSprite(i % 4 ? (i % 2 ? 0xff8a1e : 0xffcf4d) : 0xffffff);
+    sp.scale.setScalar(0.42 + Math.random() * 0.6);
     sp.position.copy(pos); sp.position.y += 0.8;
     scene.add(sp);
     const a = Math.random() * 6.28, s = 3.6 + Math.random() * 6.3;
-    localParts.push({ sp, vx: Math.cos(a) * s, vy: 3.15 + Math.random() * 4.95, vz: Math.sin(a) * s, life: 0.8 + Math.random() * 0.3 });
+    const life = 0.8 + Math.random() * 0.3;
+    localParts.push({ sp, vx: Math.cos(a) * s, vy: 3.15 + Math.random() * 4.95, vz: Math.sin(a) * s, life, maxlife: life, own: true });
   }
 }
 
@@ -529,11 +557,11 @@ export function fireCannon(tx, tz, onImpact) {
   cannonProjectiles.push({ ball, from: muzzle.clone(), to, t: 0, dur: 0.4, onImpact });
   // muzzle flash
   for (let i = 0; i < 8; i++) {
-    const sp = new THREE.Sprite(mat(i % 2 ? 0xffcf4d : 0xffffff));
-    sp.scale.setScalar(0.3 + Math.random() * 0.25);
+    const sp = softSprite(i % 2 ? 0xffcf4d : 0xffffff);
+    sp.scale.setScalar(0.34 + Math.random() * 0.28);
     sp.position.copy(muzzle); scene.add(sp);
     const a = Math.random() * 6.28, s = 1.5 + Math.random() * 2;
-    localParts.push({ sp, vx: Math.cos(a) * s, vy: 1 + Math.random() * 2, vz: Math.sin(a) * s, life: 0.3 });
+    localParts.push({ sp, vx: Math.cos(a) * s, vy: 1 + Math.random() * 2, vz: Math.sin(a) * s, life: 0.3, maxlife: 0.3, own: true });
   }
 }
 
