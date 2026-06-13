@@ -764,7 +764,7 @@ function buildTentacle() {
     }
     parent.add(seg); segs.push(seg); parent = seg;
   }
-  root.scale.setScalar(0.78);                              // slightly smaller overall
+  root.scale.setScalar(0.68);                              // slightly smaller overall
   root.userData = { segs };
   return root;
 }
@@ -810,7 +810,9 @@ function syncTentacles(S) {
     v.tent.position.y = -(1 - te.rise) * v.riseH;
     v.tent.userData.segs.forEach((seg, i) => {
       const f = i / v.tent.userData.segs.length;
-      seg.rotation.x = -0.12 - 0.14 * f - te.curl * (0.16 + 0.34 * f);   // rest bend + grab curl
+      // near-straight at rest; curl weighted to the TIP (f^2) so it stands up and
+      // hooks over at the top instead of arching into a full hoop
+      seg.rotation.x = -0.03 - te.curl * (0.05 + 0.62 * f * f);
       seg.rotation.z = Math.sin(te.t * 5 + i) * 0.04;                    // slight sway
     });
   }
