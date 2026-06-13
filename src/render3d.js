@@ -333,13 +333,13 @@ function syncTowers(S) {
       // HP number floating above the tower
       const hpBadge = makeBadge(Math.max(0, Math.ceil(t.hp)), t.side === 'you' ? '#22c24a' : '#e23b3b');
       hpBadge.scale.setScalar(1.0);
-      hpBadge.position.set(bx(t.x), t.kind === 'king' ? 3.6 : 2.9, bz(t.y));
+      hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 4.8 : 3.6) : 2.9, bz(t.y));
       scene.add(hpBadge);
       towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false });
       // mount the catapult on YOUR king tower (fires on a solved math card)
       if (t.side === 'you' && t.kind === 'king') {
         cannonObj = buildCannon();
-        cannonObj.position.set(bx(t.x), 3.1, bz(t.y) + 0.4);   // up on the roofline, toward camera
+        cannonObj.position.set(bx(t.x), 2.9, bz(t.y) + 0.7);   // on the roofline, toward camera
         scene.add(cannonObj);
       }
     }
@@ -351,7 +351,7 @@ function syncTowers(S) {
       scene.remove(v.hpBadge);
       v.hpBadge = makeBadge(hpNow, t.side === 'you' ? '#22c24a' : '#e23b3b');
       v.hpBadge.scale.setScalar(1.0);
-      v.hpBadge.position.set(bx(t.x), t.kind === 'king' ? 3.6 : 2.9, bz(t.y));
+      v.hpBadge.position.set(bx(t.x), t.kind === 'king' ? (t.side === 'you' ? 4.8 : 3.6) : 2.9, bz(t.y));
       scene.add(v.hpBadge);
       v.hpShown = hpNow;
     }
@@ -519,7 +519,7 @@ function syncParts(S, dt) {
 // base so it reads as an emplacement on the castle). Falls back to a built
 // primitive cannon if the model isn't available. Tunable:
 const CANNON_SCALE = 1.9;     // catapult size on the castle roof
-const CANNON_YAW = 0;         // face the enemy (-Z); flip if it points the wrong way
+const CANNON_YAW = Math.PI;   // face the enemy (-Z); flip if it points the wrong way
 
 function buildCannon() {
   return assets.catapult ? buildCatapult() : buildPrimitiveCannon();
