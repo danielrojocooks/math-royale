@@ -80,8 +80,9 @@ function startMatch(profile, arenaId, isBoss) {
   battle.configureBattle({
     foeMaxVal: arena.foeMaxVal,
     bossSpawn: isBoss ? { spr: arena.boss.spr, val: arena.boss.val } : null,
-    // River tentacle hazard scales with arena: rarer/weaker early, often/wider late.
-    tentacle: { period: Math.max(2.4, 7.6 - arenaId * 0.8), reach: 52 + arenaId * 12 },
+    // River tentacle hazard scales with arena (none on open-field/no-river arenas).
+    tentacle: (arena.theme.riverShape === 'none') ? null
+      : { period: Math.max(2.4, 7.6 - arenaId * 0.8), reach: 52 + arenaId * 12 },
   });
 
   // 2. Resolve profile.deck ids through the roster and arm the active deck.

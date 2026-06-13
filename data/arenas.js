@@ -61,8 +61,8 @@ export const ARENAS = [
     // Weakest villain as boss (val 2); enemy spawns capped at 2 so matches stay easy
     boss: { name: 'Poisoner', spr: 'unit_20', val: 2 },
     foeMaxVal: 2,
-    // bright sunny meadow (the default look)
-    theme: { flora: 'green' },
+    // bright sunny meadow — OPEN FIELD: no river, no bridges
+    theme: { flora: 'green', riverShape: 'none', bridges: false },
   },
   {
     id: 2,
@@ -90,8 +90,8 @@ export const ARENAS = [
     ],
     boss: { name: 'Chain Brute', spr: 'unit_18', val: 4 },
     foeMaxVal: 4,
-    // deep dark forest: dense trees, dim golden light
-    theme: { sky: 0x6f9e7a, fog: 0x6f9e7a, ground: 0x3f7a2c, lane: 0x559440, river: 0x2f7fae, hemi: 0.8, sun: 1.5, sunColor: 0xffe9b0, flora: 'dense' },
+    // deep dark forest: dense trees, dim golden light — SNAKE RIVER winds through
+    theme: { sky: 0x6f9e7a, fog: 0x6f9e7a, ground: 0x3f7a2c, lane: 0x559440, river: 0x2f7fae, hemi: 0.8, sun: 1.5, sunColor: 0xffe9b0, flora: 'dense', riverShape: 'snake' },
   },
   {
     id: 4,

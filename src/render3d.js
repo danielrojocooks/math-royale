@@ -47,9 +47,11 @@ let readyResolve; const readyPromise = new Promise(r => { readyResolve = r; });
 const DEFAULT_THEME = {
   sky: 0x8fd0ff, fog: 0x8fd0ff, ground: 0x6db33a, lane: 0x86c457, river: 0x3aa5e0,
   hemi: 1.15, sun: 2.0, sunColor: 0xffffff, flora: 'green',
+  riverShape: 'straight', bridges: true,   // per-arena scene layout
 };
 let theme = { ...DEFAULT_THEME };
-let themeGroup = null, groundMat, laneMats = [], riverMat, hemiLight, sunLight;
+let themeGroup = null, groundMat, laneMats = [], hemiLight, sunLight, riverObj = null;
+const RIVER_AMP = 3.0, RIVER_FREQ = 0.5;   // snake-river wave (depth swing / frequency)
 
 export function applyTheme(t) {
   theme = { ...DEFAULT_THEME, ...(t || {}) };
@@ -60,7 +62,10 @@ function rebuildTheme() {
   scene.fog.color.set(theme.fog);
   groundMat.color.set(theme.ground);
   for (const m of laneMats) m.color.set(theme.lane);
-  riverMat.color.set(theme.river);
+  // river: rebuild per arena (straight band / snake / none)
+  if (riverObj) { scene.remove(riverObj); riverObj.geometry?.dispose(); riverObj.material?.dispose(); riverObj = null; }
+  riverObj = buildRiver(theme);
+  if (riverObj) scene.add(riverObj);
   hemiLight.intensity = theme.hemi;
   sunLight.intensity = theme.sun;
   sunLight.color.set(theme.sunColor);
@@ -145,11 +150,33 @@ function buildField() {
     lane.rotation.x = -Math.PI / 2; lane.position.set(bx(lx), 0.01, bz(560));
     lane.receiveShadow = true; scene.add(lane);
   }
-  // river spans the whole visible width
-  riverMat = new THREE.MeshLambertMaterial({ color: 0x3aa5e0 });
-  const river = new THREE.Mesh(new THREE.PlaneGeometry(30, (RIVER_B - RIVER_T) / UZ + 0.4), riverMat);
-  river.rotation.x = -Math.PI / 2; river.position.set(0, 0.02, bz((RIVER_T + RIVER_B) / 2));
-  scene.add(river);
+  // river is built per-arena in rebuildTheme (shape varies: straight / snake / none)
+}
+
+// ---- river geometry (per-arena shape) ----
+function buildRiver(t) {
+  if (t.riverShape === 'none') return null;
+  const color = t.river ?? 0x3aa5e0;
+  if (t.riverShape === 'snake') {
+    const Wd = 44, half = 1.9, segs = 64, pos = [], idx = [];
+    for (let i = 0; i <= segs; i++) {
+      const x = -Wd / 2 + (i / segs) * Wd;
+      const z = Math.sin(x * RIVER_FREQ) * RIVER_AMP;
+      const dz = Math.cos(x * RIVER_FREQ) * RIVER_AMP * RIVER_FREQ;
+      const len = Math.hypot(1, dz), nx = -dz / len, nz = 1 / len;     // path normal in XZ
+      pos.push(x + nx * half, 0.02, z + nz * half, x - nx * half, 0.02, z - nz * half);
+    }
+    for (let i = 0; i < segs; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+  }
+  // straight (default): a wide flat band across the middle
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(40, (RIVER_B - RIVER_T) / UZ + 0.4),
+    new THREE.MeshLambertMaterial({ color }));
+  m.rotation.x = -Math.PI / 2; m.position.set(0, 0.02, bz((RIVER_T + RIVER_B) / 2));
+  return m;
 }
 
 // ---- assets ----
@@ -260,8 +287,15 @@ function place(model, x, z, s, ry) {
 function decorate() {
   const e = assets.env, P = assets.props;
   const rng = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5; return s - Math.floor(s); };
-  // bridges over the river at each lane
-  for (const lx of LANE) place(e.bridge, bx(lx), bz(530), 1.5, Math.PI / 2);
+  // bridges over the river at each lane (skip on open-field arenas; follow the snake)
+  if (theme.bridges !== false && theme.riverShape !== 'none') {
+    const snake = theme.riverShape === 'snake';
+    for (const lx of LANE) {
+      const wx = bx(lx);
+      const wz = snake ? Math.sin(wx * RIVER_FREQ) * RIVER_AMP : bz(530);
+      place(e.bridge, wx, wz, 1.5, Math.PI / 2);
+    }
+  }
   // builder-pack landmarks in the side meadows (kept well clear of the lanes —
   // perspective lets near-lane trees occlude units)
   place(e.forest, -9.0, 3.5, 1.3); place(e.hill, 8.8, -6.5, 1.3);
