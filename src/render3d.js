@@ -354,7 +354,8 @@ function decorate() {
 
 // archers standing on a tower (the visible defenders that fire the arrows)
 function buildArchers(t) {
-  const def = MODEL3D.unit_03;                  // Ranger w/ bow for everyone (tower archers)
+  // yours = Ranger archer; enemy = skeleton archer (skeleton rig + bow in the hand socket)
+  const def = t.side === 'you' ? MODEL3D.unit_03 : { glb: 'Skeleton_Minion', l: 'bow_A_withString' };
   const n = t.kind === 'king' ? 2 : 1;
   const out = [];
   for (let k = 0; k < n; k++) {
