@@ -137,7 +137,7 @@ function oppTower(side, lane) {
 function spawnTentacle() {
   const x = 130 + Math.random() * 500;                   // within the field width
   const y = RIVER_T + Math.random() * (RIVER_B - RIVER_T);
-  S.tentacles.push({ x, y, phase: 'warn', t: 0, rise: 0, grabbed: null, done: false });
+  S.tentacles.push({ x, y, phase: 'warn', t: 0, rise: 0, curl: 0, grabbed: null, done: false });
 }
 function dragUnder(tr) {
   if (tr.dead) return;
@@ -153,7 +153,7 @@ function updateTentacles(dt) {
   for (const te of S.tentacles) {
     te.t += dt;
     if (te.phase === 'warn') {
-      te.rise = 0;
+      te.rise = 0; te.curl = 0;
       if (te.t >= TENT_WARN) {
         te.phase = 'strike'; te.t = 0;
         // grab the nearest living, ungrabbed unit within reach
@@ -171,6 +171,7 @@ function updateTentacles(dt) {
       }
     } else if (te.phase === 'strike') {
       te.rise = Math.min(1, te.t / TENT_EMERGE);
+      te.curl = Math.min(1, te.t / TENT_STRIKE);          // curls in to grab
       if (te.grabbed && !te.grabbed.dead) {
         const tr = te.grabbed, k = Math.min(1, dt * 5);
         tr.x += (te.x - tr.x) * k; tr.y += (te.y - tr.y) * k;     // pull toward the tentacle
@@ -181,6 +182,7 @@ function updateTentacles(dt) {
       }
     } else {                                                       // retract
       te.rise = Math.max(0, 1 - te.t / TENT_RETRACT);
+      te.curl = 1;                                                 // stays curled as it sinks
       if (te.t >= TENT_RETRACT) te.done = true;
     }
   }

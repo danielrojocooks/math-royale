@@ -739,31 +739,51 @@ function updateDragons(dt) {
   }
 }
 
-// ---- river tentacle hazard: ripple telegraph -> rising curled tentacle ----
+// ---- river tentacle hazard: ripple telegraph -> rising tapered tentacle that curls ----
+// Jointed chain of tapering segments (so it can curl to grab), pink-purple with
+// pale suckers down the inner side. Suckers face -Z (the curl direction).
 function buildTentacle() {
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(0.15, 0.9, 0.10),
-    new THREE.Vector3(-0.10, 1.7, 0.25),
-    new THREE.Vector3(0.35, 2.3, 0.15),
-    new THREE.Vector3(0.75, 2.55, -0.05),    // curl over at the tip
-  ]);
-  const geo = new THREE.TubeGeometry(curve, 22, 0.27, 8, false);
-  const mat = new THREE.MeshLambertMaterial({ color: 0x356f5f });
-  const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true;
-  const g = new THREE.Group(); g.add(mesh);
+  const root = new THREE.Group();
+  const N = 7, segLen = 0.32, baseR = 0.23, tipR = 0.035;
+  const body = new THREE.MeshLambertMaterial({ color: 0xb24ba6 });   // purple-pink
+  const suck = new THREE.MeshLambertMaterial({ color: 0xf3b9da });   // pale pink suckers
+  const segs = [];
+  let parent = root;
+  for (let i = 0; i < N; i++) {
+    const seg = new THREE.Group();
+    if (i > 0) seg.position.y = segLen;
+    const r0 = baseR + (tipR - baseR) * (i / N);
+    const r1 = baseR + (tipR - baseR) * ((i + 1) / N);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, segLen, 9), body);
+    m.position.y = segLen / 2; m.castShadow = true; seg.add(m);
+    for (let s = 0; s < 2; s++) {                          // suckers on the inner (-Z) face
+      const d = new THREE.Mesh(new THREE.CylinderGeometry(r0 * 0.3, r0 * 0.3, 0.03, 8), suck);
+      d.rotation.x = Math.PI / 2;
+      d.position.set(0, segLen * (0.26 + 0.46 * s), -(r0 * 0.82));
+      seg.add(d);
+    }
+    parent.add(seg); segs.push(seg); parent = seg;
+  }
+  root.scale.setScalar(0.78);                              // slightly smaller overall
+  root.userData = { segs };
+  return root;
+}
+// Concentric expanding water rings (a disturbance, not a flat halo)
+function makeRipple() {
+  const g = new THREE.Group();
+  const rings = [];
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.46, 0.6, 32),
+      new THREE.MeshBasicMaterial({ color: 0x8fd6ff, transparent: true, opacity: 0.6,
+        side: THREE.DoubleSide, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.y = 0.05;
+    g.add(m); rings.push(m);
+  }
+  g.userData = { rings };
   return g;
 }
-function makeRipple() {
-  const m = new THREE.Mesh(
-    new THREE.RingGeometry(0.35, 0.62, 28),
-    new THREE.MeshBasicMaterial({ color: 0xcdeeff, transparent: true, opacity: 0.7,
-      side: THREE.DoubleSide, depthWrite: false }));
-  m.rotation.x = -Math.PI / 2; m.position.y = 0.06;
-  return m;
-}
 function syncTentacles(S) {
-  if (!ready) return;
+  if (!ready || !S.tentacles) return;
   const seen = new Set();
   for (const te of S.tentacles) {
     seen.add(te);
@@ -772,22 +792,27 @@ function syncTentacles(S) {
       const group = new THREE.Group();
       group.position.set(bx(te.x), 0, bz(te.y));
       group.rotation.y = (Math.sin(te.x * 12.9) * 43758.5) % 6.28;   // varied facing
-      const ring = makeRipple(), tent = buildTentacle();
-      tent.visible = false;
-      group.add(ring); group.add(tent); scene.add(group);
-      v = { group, ring, tent }; tentVis.set(te, v);
+      const ripple = makeRipple(), tent = buildTentacle();
+      group.add(ripple); group.add(tent); scene.add(group);
+      v = { group, ripple, tent, riseH: 2.0 }; tentVis.set(te, v);
     }
-    if (te.phase === 'warn') {
-      v.ring.visible = true; v.tent.visible = false;
-      v.ring.scale.setScalar(0.7 + te.t * 1.4);
-      v.ring.material.opacity = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(te.t * 16));
-    } else {
-      v.tent.visible = true;
-      v.tent.scale.set(1, Math.max(0.04, te.rise), 1);     // rise out of the water
-      v.ring.visible = te.phase === 'strike';
-      v.ring.material.opacity = 0.3 * te.rise;
-      v.ring.scale.setScalar(1.5);
-    }
+    // ripple: continuous expanding rings during the warn telegraph, fading as it rises
+    const showR = te.phase === 'warn' ? 1 : Math.max(0, 1 - te.rise);
+    v.ripple.userData.rings.forEach((r, i) => {
+      const p = ((te.t * 1.3) + i / 3) % 1;
+      r.scale.setScalar(0.5 + p * 1.7);
+      r.material.opacity = (1 - p) * 0.55 * showR;
+      r.visible = showR > 0.02;
+    });
+    // tentacle: rise from below the water (water plane hides the submerged part),
+    // curl the joints inward to grab
+    v.tent.visible = te.phase !== 'warn';
+    v.tent.position.y = -(1 - te.rise) * v.riseH;
+    v.tent.userData.segs.forEach((seg, i) => {
+      const f = i / v.tent.userData.segs.length;
+      seg.rotation.x = -0.12 - 0.14 * f - te.curl * (0.16 + 0.34 * f);   // rest bend + grab curl
+      seg.rotation.z = Math.sin(te.t * 5 + i) * 0.04;                    // slight sway
+    });
   }
   for (const [te, v] of tentVis) {
     if (!seen.has(te)) {
