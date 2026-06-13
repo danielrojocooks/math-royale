@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Royale — Level Previews</title>
+<style>
+  body { margin: 0; background: #14101e; color: #eee;
+    font-family: "Trebuchet MS","Segoe UI",sans-serif; padding: 18px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #9a8fb5; font-size: 13px; margin: 0 0 18px; }
+  #grid { display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .card { background: #1f1830; border: 2px solid #2e2444; border-radius: 12px;
+    overflow: hidden; }
+  .card.proposed { border-color: #6b4ea0; border-style: dashed; }
+  .card img { width: 100%; display: block; background: #000; }
+  .cap { padding: 8px 12px 12px; }
+  .cap b { font-size: 16px; }
+  .tag { background: #6b4ea0; color: #fff; font-size: 10px; font-weight: 900;
+    padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
+  .meta { color: #9a8fb5; font-size: 12px; margin-top: 4px; }
+  .swatches { display: flex; gap: 4px; margin-top: 7px; }
+  .sw { width: 22px; height: 14px; border-radius: 3px; border: 1px solid #0006; }
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+}}
+</script>
+</head>
+<body>
+<h1>Math Royale — Level Previews</h1>
+<p class="sub">Each arena rendered from its real theme data (sky / ground / river / lighting / flora). Dashed cards are proposed new levels — the color mood is shown; the dynamic effects (rain, lightning, eruptions) would be added as telegraphed random events like the river tentacle.</p>
+<div id="grid"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { ARENAS } from './data/arenas.js';
+
+// Proposed new themes (Daniel's ideas). fx = the dynamic hazard we'd layer on.
+const PROPOSED = [
+  { name: 'Storm Front', emoji: '⛈️', fx: 'rain + random lightning strikes',
+    theme: { sky: 0x46505f, fog: 0x46505f, ground: 0x3c5740, lane: 0x4d6e4a, river: 0x2b4866,
+             hemi: 0.7, sun: 0.9, sunColor: 0xaab6cc, flora: 'night' } },
+  { name: 'Volcano', emoji: '🌋', fx: 'smoke haze + random eruptions',
+    theme: { sky: 0x2e1714, fog: 0x4a241a, ground: 0x4a2a22, lane: 0x5e362a, river: 0xe4581e,
+             hemi: 0.6, sun: 1.1, sunColor: 0xff8a44, flora: 'rocky' } },
+];
+
+const W = 460, H = 300;
+const ren = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+ren.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+ren.setSize(W, H);
+
+const FLORA = {
+  green: { top: 0x4faf3a, n: 16, kind: 'tree' },
+  dense: { top: 0x2f7a2a, n: 24, kind: 'tree' },
+  rocky: { top: 0x8a8378, n: 16, kind: 'rock' },
+  frost: { top: 0xeaf4ff, n: 14, kind: 'bare' },
+  night: { top: 0x24502c, n: 16, kind: 'tree' },
+};
+
+function rng(seed) { let s = seed || 1; return () => { s = Math.sin(s * 127.1 + 311.7) * 43758.5; return s - Math.floor(s); }; }
+
+function makeProp(f, s, x, z, r) {
+  const g = new THREE.Group();
+  if (f.kind === 'rock') {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.55 * s),
+      new THREE.MeshLambertMaterial({ color: f.top }));
+    rock.position.y = 0.35 * s; g.add(rock);
+  } else {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.16 * s, 0.9 * s, 6),
+      new THREE.MeshLambertMaterial({ color: 0x6b4a2b }));
+    trunk.position.y = 0.45 * s; g.add(trunk);
+    if (f.kind === 'bare') {
+      const top = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2 * s),
+        new THREE.MeshLambertMaterial({ color: f.top }));
+      top.position.y = 1.0 * s; g.add(top);
+    } else {
+      const top = new THREE.Mesh(new THREE.ConeGeometry(0.55 * s, 1.15 * s, 7),
+        new THREE.MeshLambertMaterial({ color: f.top }));
+      top.position.y = 1.25 * s; g.add(top);
+    }
+  }
+  g.position.set(x, 0, z); g.rotation.y = r() * 6.28;
+  return g;
+}
+
+function addCastle(scene, z, accent) {
+  const stone = new THREE.MeshLambertMaterial({ color: 0x9aa3ad });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 2.4), stone);
+  base.position.set(0, 0.8, z); scene.add(base);
+  const keep = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.2, 1.3), stone);
+  keep.position.set(0, 1.9, z); scene.add(keep);
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 0.04),
+    new THREE.MeshLambertMaterial({ color: accent }));
+  flag.position.set(0.32, 2.7, z); scene.add(flag);
+}
+
+function makeScene(t) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(t.sky ?? 0x8fd0ff);
+  scene.fog = new THREE.Fog(t.fog ?? t.sky ?? 0x8fd0ff, 22, 48);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(52, 52),
+    new THREE.MeshLambertMaterial({ color: t.ground ?? 0x6db33a }));
+  ground.rotation.x = -Math.PI / 2; scene.add(ground);
+  for (const lx of [-3.2, 3.2]) {
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 30),
+      new THREE.MeshLambertMaterial({ color: t.lane ?? 0x86c457 }));
+    lane.rotation.x = -Math.PI / 2; lane.position.set(lx, 0.01, 0); scene.add(lane);
+  }
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(44, 3.4),
+    new THREE.MeshLambertMaterial({ color: t.river ?? 0x3aa5e0 }));
+  river.rotation.x = -Math.PI / 2; river.position.set(0, 0.02, 0); scene.add(river);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x556644, t.hemi ?? 1.15));
+  const sun = new THREE.DirectionalLight(t.sunColor ?? 0xffffff, t.sun ?? 2.0);
+  sun.position.set(6, 12, 5); scene.add(sun);
+  const f = FLORA[t.flora] || FLORA.green;
+  const r = rng((t.sky ?? 1) % 9973 + 7);
+  for (let i = 0; i < f.n; i++) {
+    const side = i % 2 ? 1 : -1;
+    const x = side * (5.2 + r() * 9), z = -12 + r() * 24, s = 0.7 + r() * 0.7;
+    scene.add(makeProp(f, s, x, z, r));
+  }
+  addCastle(scene, -11.5, 0xe23b3b);   // enemy (far)
+  addCastle(scene, 11.5, 0x2b7de0);    // yours (near)
+  const cam = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+  cam.position.set(0.6, 10, 13.5); cam.lookAt(0, 0.3, -1.5);
+  return { scene, cam };
+}
+
+function thumb(t) { const { scene, cam } = makeScene(t); ren.render(scene, cam); return ren.domElement.toDataURL('image/png'); }
+const hex = c => '#' + (c ?? 0).toString(16).padStart(6, '0');
+
+const grid = document.getElementById('grid');
+function addCard(item, proposed) {
+  const t = item.theme;
+  const div = document.createElement('div');
+  div.className = 'card' + (proposed ? ' proposed' : '');
+  const sw = [t.sky, t.ground, t.lane, t.river].map(c => `<span class="sw" style="background:${hex(c)}"></span>`).join('');
+  div.innerHTML =
+    `<img src="${thumb(t)}" width="${W}" height="${H}">` +
+    `<div class="cap"><b>${item.emoji || ''} ${item.name}</b>${proposed ? '<span class="tag">PROPOSED</span>' : ''}` +
+    `<div class="meta">flora: ${t.flora || 'green'}${item.fx ? ' · fx: ' + item.fx : ''}</div>` +
+    `<div class="swatches">${sw}</div></div>`;
+  grid.appendChild(div);
+}
+
+ARENAS.forEach(a => addCard(a, false));
+PROPOSED.forEach(p => addCard(p, true));
+</script>
+</body>
+</html>
