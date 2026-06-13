@@ -662,20 +662,25 @@ function makeDragon() {
   return { g, mixer };
 }
 
-function breatheFire(from, tx, tz) {
-  const to = new THREE.Vector3(tx, 0.6, tz);
+// A tight fiery STREAM from the mouth toward the target. Called every frame during
+// the breath window (so it stays attached to the moving mouth instead of trailing).
+const FIRE_COLORS = [0xd81e00, 0xff3a0a, 0xff5a14, 0xff7a1e];  // deep red -> orange
+function breatheFire(from, tx, tz, count) {
+  const to = new THREE.Vector3(tx, 0.55, tz);
   const dir = to.clone().sub(from).normalize();
-  for (let i = 0; i < 36; i++) {
-    const sp = softSprite(i % 2 ? 0xff7a1e : 0xffcf4d);
-    sp.scale.setScalar(0.6 + Math.random() * 0.8);
+  for (let i = 0; i < count; i++) {
+    const sp = softSprite(FIRE_COLORS[(Math.random() * FIRE_COLORS.length) | 0]);
+    sp.scale.setScalar(0.45 + Math.random() * 0.65);
     sp.position.copy(from);
+    sp.position.x += (Math.random() - 0.5) * 0.3;
+    sp.position.z += (Math.random() - 0.5) * 0.3;
     scene.add(sp);
-    const s = 7 + Math.random() * 6, spr = 2.1;
+    const s = 9 + Math.random() * 5, spr = 1.0;          // fast + narrow = a jet, not a cloud
     localParts.push({ sp,
       vx: dir.x * s + (Math.random() - 0.5) * spr,
       vy: dir.y * s + (Math.random() - 0.5) * spr,
       vz: dir.z * s + (Math.random() - 0.5) * spr,
-      life: 0.55 + Math.random() * 0.35, maxlife: 0.9, own: true });
+      life: 0.32 + Math.random() * 0.22, maxlife: 0.54, own: true });
   }
 }
 
@@ -711,12 +716,15 @@ function updateDragons(dt) {
     d.obj.position.y = DRAGON_ALT - Math.sin(f * Math.PI) * 1.6;   // dip toward the field mid-pass
     d.obj.rotation.y = d.yaw;
     d.obj.rotation.z = Math.sin(d.t * 7) * 0.07;                   // subtle bank/wingbeat life
-    if (!d.fired && f >= 0.5) {
-      d.fired = true;
-      // fire erupts from the MOUTH: a point out the front of the dragon (nose leads)
+    // breath window: stream fire from the mouth each frame as the dragon passes
+    // over the target (mouth recomputed per-frame so the jet tracks the head)
+    if (f >= 0.42 && f <= 0.66) {
       const fwd = new THREE.Vector3(d.toX - d.fromX, 0, d.toZ - d.fromZ).normalize();
-      const mouth = d.obj.position.clone().addScaledVector(fwd, DRAGON_HEAD); mouth.y -= 0.4;
-      breatheFire(mouth, d.target.x, d.target.z);
+      const mouth = d.obj.position.clone().addScaledVector(fwd, DRAGON_HEAD); mouth.y -= 0.35;
+      breatheFire(mouth, d.target.x, d.target.z, 3);
+    }
+    if (!d.fired && f >= 0.5) {        // the kill + impact boom land once, mid-stream
+      d.fired = true;
       bigBoom(new THREE.Vector3(d.target.x, 0.6, d.target.z));
       if (d.onImpact) d.onImpact();
     }
