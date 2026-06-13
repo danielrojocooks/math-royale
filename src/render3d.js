@@ -118,9 +118,13 @@ function resize() {
   const fitD = 10.8 / vF * 0.66;                   // full depth incl BOTH castles
   const dist = Math.max(9.0, fitW, fitD);
   // slightly oblique CR tilt, centered so both castles are on screen
-  // (landscape HUD docks right, so the bottom of the screen is usable field)
-  cam.position.set(0.9, dist * 0.9, dist * 0.98);
-  cam.lookAt(0, 0, -1.0);
+  // (landscape HUD docks right, so the bottom of the screen is usable field).
+  // Portrait sits a touch higher and aims further downrange so YOUR near castle
+  // shrinks a bit and the enemy castle reads bigger (more balanced framing).
+  const camY = portrait ? dist * 0.98 : dist * 0.9;
+  const lookZ = portrait ? -2.4 : -1.0;
+  cam.position.set(0.9, camY, dist * 0.98);
+  cam.lookAt(0, 0, lookZ);
   cam.updateProjectionMatrix();
 }
 
