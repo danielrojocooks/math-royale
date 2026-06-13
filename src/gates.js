@@ -35,7 +35,7 @@ export function setFactPools(pool, earlier) {
   EARLIER_POOLS = earlier || [];
 }
 
-const IDLE_SUBMIT_MS = 1000;   // pause after last tap = submit
+const IDLE_SUBMIT_MS = 700;    // pause after last tap = submit (snappier)
 const COOLDOWN_MS = 8000;      // per-board cooldown between math cards
 
 let cardEl = null;             // the single floating card (one at a time)
@@ -182,9 +182,9 @@ function openCard(reward) {
   // INPUT GRADUATES WITH MASTERY: T0/T1 = tap-to-count (production/counting stage),
   // T2 = pick the answer (recall stage). The engine demotes on misses, so a
   // guessed-wrong fact slides back to counting mode automatically.
-  // EXCEPTION: answers over 10 always use multiple-choice — tapping 11-19 times
-  // is impractical (and not the point at that range).
-  const mode = (tier >= 2 || f.sum > 10) ? 'choose' : 'count';
+  // EXCEPTION: answers over 6 use multiple-choice — tapping 7+ times is slow and
+  // stops being a counting exercise at that range.
+  const mode = (tier >= 2 || f.sum > 6) ? 'choose' : 'count';
 
   cardState = { reward, profile, factId, ...f, mode, count: 0,
     firstTapAt: mode === 'choose' ? Date.now() : 0, idleTimer: null, tier, missed: false };
