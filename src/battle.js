@@ -62,8 +62,8 @@ export function reset() {
   // Enemy pushed back toward the top edge + player front nudged back to lengthen
   // the contested middle (longer matches).
   S.towers = [
-    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 30),
-    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 30),
+    tower('foe', 'prin', LANE[0], 150, 0, 14), tower('foe', 'prin', LANE[1], 150, 1, 14), tower('foe', 'king', 380, 40, -1, 48),
+    tower('you', 'prin', LANE[0], 785, 0, 14), tower('you', 'prin', LANE[1], 785, 1, 14), tower('you', 'king', 380, 915, -1, 48),
   ];
   S.troops = []; S.parts = []; S.decals = []; S.pops = [];
   S.elixir = 5; S.foeElixir = 5; S.foeTimer = 2.5;
@@ -200,7 +200,7 @@ function towerFire(dt) {
     if (tw.dead || tw.kind !== 'king') continue;
     tw.atkcd -= dt;
     if (tw.atkcd > 0) continue;
-    let best = null, bd = 160;                          // shorter range: troops can close in
+    let best = null, bd = 190;                          // reach to thin an approaching wave
     for (const t of S.troops) {
       if (t.dead || t.side === tw.side || t.grabbed) continue;
       const d = Math.hypot(t.x - tw.x, t.y - tw.y);
