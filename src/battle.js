@@ -200,7 +200,7 @@ function towerFire(dt) {
     if (tw.dead || tw.kind !== 'king') continue;
     tw.atkcd -= dt;
     if (tw.atkcd > 0) continue;
-    let best = null, bd = 190;                          // reach to thin an approaching wave
+    let best = null, bd = 250;                          // reach to engage units approaching the king
     for (const t of S.troops) {
       if (t.dead || t.side === tw.side || t.grabbed) continue;
       const d = Math.hypot(t.x - tw.x, t.y - tw.y);
