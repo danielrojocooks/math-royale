@@ -24,11 +24,12 @@ let _cfg = { foeMaxVal: Infinity, bossSpawn: null, tentacle: null };
  * tentacle: { period, reach } river hazard intensity, or null to disable.
  * @param {{ foeMaxVal?: number, bossSpawn?: {spr:string, val:number}|null, tentacle?: {period:number,reach:number}|null }} opts
  */
-export function configureBattle({ foeMaxVal, bossSpawn, tentacle } = {}) {
+export function configureBattle({ foeMaxVal, bossSpawn, tentacle, level } = {}) {
   _cfg = {
     foeMaxVal: foeMaxVal ?? Infinity,
     bossSpawn: bossSpawn ?? null,
     tentacle: tentacle ?? null,
+    level: level ?? 1,          // arena number; scales king fire rate
   };
 }
 
@@ -195,19 +196,20 @@ function updateTentacles(dt) {
 // Arrows chip a troop's value (size = magnitude shrinks it); king shoots harder.
 function towerFire(dt) {
   for (const tw of S.towers) {
-    if (tw.dead) continue;
+    // ONLY KINGS shoot — princess crossfire forced a stalemate (nothing got through).
+    if (tw.dead || tw.kind !== 'king') continue;
     tw.atkcd -= dt;
     if (tw.atkcd > 0) continue;
-    const range = tw.kind === 'king' ? 215 : 175;
-    let best = null, bd = range;
+    let best = null, bd = 215;
     for (const t of S.troops) {
       if (t.dead || t.side === tw.side || t.grabbed) continue;
       const d = Math.hypot(t.x - tw.x, t.y - tw.y);
       if (d < bd) { bd = d; best = t; }
     }
     if (!best) { tw.atkcd = 0.3; continue; }            // scan faster when nothing in range
-    const ramp = 1 + Math.min(1.0, S.T / 100);          // archers speed up as the match drags on
-    tw.atkcd = (tw.kind === 'king' ? 0.7 : 0.95) / ramp;
+    const levelScale = 1 + (_cfg.level - 1) * 0.18;     // faster each arena
+    const matchRamp = 1 + Math.min(0.6, S.T / 150);     // gentle within-match speed-up
+    tw.atkcd = 0.7 / (levelScale * matchRamp);
     S.arrows.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y });   // render draws the flying arrow
     best.val -= 1; best.flash = .2; best.hit = .2;
     popup(best.x, best.y - 30, '-1', tw.side === 'you' ? '#bff' : '#fbb');

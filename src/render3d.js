@@ -79,6 +79,7 @@ let partVis = new Map(), matCache = {};
 let cannonObj = null, cannonProjectiles = [];   // cannon on your king + in-flight shots
 let dragons = [];                                // active fly-in dragons (fire-breath on solve)
 let currentWeapon = 'cannon';                    // per-arena: 'cannon' or 'dragon' (set by main.js)
+let arenaLevel = 1;                              // arena number (set by main.js) — king archer count
 let tentVis = new Map();                          // river tentacle hazard visuals
 
 export function initRender(canvas) {
@@ -354,9 +355,10 @@ function decorate() {
 
 // archers standing on a tower (the visible defenders that fire the arrows)
 function buildArchers(t) {
+  if (t.kind !== 'king') return [];               // archers are KING-only (princess crossfire stalemated)
   // yours = Ranger archer; enemy = skeleton archer (skeleton rig + bow in the hand socket)
   const def = t.side === 'you' ? MODEL3D.unit_03 : { glb: 'Skeleton_Minion', l: 'bow_A_withString' };
-  const n = t.kind === 'king' ? 2 : 1;
+  const n = arenaLevel >= 3 ? 2 : 1;              // 1 archer early, 2 from arena 3
   const out = [];
   for (let k = 0; k < n; k++) {
     const obj = buildCharacter(def);
@@ -886,6 +888,9 @@ function syncTentacles(S) {
 /** setWeapon — choose this arena's solve weapon ('cannon' or 'dragon'). Call before
  *  the match resets so syncTowers mounts (or skips) the cannon accordingly. */
 export function setWeapon(w) { currentWeapon = w === 'dragon' ? 'dragon' : 'cannon'; }
+
+/** setArenaLevel — arena number; controls king archer count (2 from arena 3). */
+export function setArenaLevel(n) { arenaLevel = n || 1; }
 
 /** fireWeapon — fire whichever weapon this arena uses (gates.js calls this on a solve). */
 export function fireWeapon(tx, tz, onImpact) {

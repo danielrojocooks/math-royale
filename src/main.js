@@ -12,7 +12,7 @@
 // handler we call e.stopImmediatePropagation() so input.js never sees the tap,
 // then we navigate to arena select ourselves.
 
-import { initRender, render, applyTheme, setWeapon } from './render3d.js';
+import { initRender, render, applyTheme, setWeapon, setArenaLevel } from './render3d.js';
 import { initHud, updateHud } from './hud3d.js';
 import { initInput } from './input.js';
 import * as battle from './battle.js';
@@ -75,6 +75,7 @@ function startMatch(profile, arenaId, isBoss) {
 
   // 0b. Solve weapon alternates by arena: odd = cannon, even = dragon.
   setWeapon(arenaId % 2 === 0 ? 'dragon' : 'cannon');
+  setArenaLevel(arenaId);
 
   // 1. Configure battle: restrict foe spawns + optional boss unit.
   battle.configureBattle({
@@ -83,6 +84,7 @@ function startMatch(profile, arenaId, isBoss) {
     // River tentacle hazard scales with arena (none on open-field/no-river arenas).
     tentacle: (arena.theme.riverShape === 'none') ? null
       : { period: Math.max(2.4, 7.6 - arenaId * 0.8), reach: 52 + arenaId * 12 },
+    level: arenaId,   // scales king fire rate
   });
 
   // 2. Resolve profile.deck ids through the roster and arm the active deck.
