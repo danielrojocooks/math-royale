@@ -178,6 +178,9 @@ async function loadAssets() {
         if (rs[0].status === 'fulfilled') { assets.dragon = rs[0].value.scene; assets.dragonClips = rs[0].value.animations || []; }
         else { assets.dragon = null; assets.dragonClips = []; }
       }),
+    // KayKit CC0 catapult for the tower cannon (optional; primitive fallback)
+    Promise.allSettled([loadGlb(loader, 'assets/game/env/catapult.gltf')])
+      .then(rs => { assets.catapult = rs[0].status === 'fulfilled' ? rs[0].value.scene : null; }),
   ]);
   for (const lib of libs) for (const c of lib.animations) assets.clips[c.name] = c;
   names.forEach((n, i) => { assets.chars[n] = chars[i].scene; });
@@ -512,7 +515,36 @@ function syncParts(S, dt) {
 }
 
 // ---- tower cannon: a catapult on your king that fires on a solved math card ----
+// Prefer the KayKit CC0 catapult (turret + throwing arm, lifted off its tower
+// base so it reads as an emplacement on the castle). Falls back to a built
+// primitive cannon if the model isn't available. Tunable:
+const CANNON_SCALE = 1.9;     // catapult size on the castle roof
+const CANNON_YAW = 0;         // face the enemy (-Z); flip if it points the wrong way
+
 function buildCannon() {
+  return assets.catapult ? buildCatapult() : buildPrimitiveCannon();
+}
+
+function buildCatapult() {
+  const g = new THREE.Group();
+  const inner = new THREE.Group();
+  const src = SkeletonUtils.clone(assets.catapult);
+  let turret = null, arm = null;
+  src.traverse(n => {
+    if (/catapult_turret/i.test(n.name)) turret = n;
+    if (/catapult_arm/i.test(n.name)) arm = n;
+  });
+  if (turret) { turret.position.set(0, 0, 0); inner.add(turret); }  // drop the tower base
+  else inner.add(src);                                              // safety: whole model
+  inner.traverse(n => { if (n.isMesh) { n.castShadow = true; n.material = n.material.clone(); } });
+  inner.rotation.y = CANNON_YAW;
+  g.add(inner);
+  g.scale.setScalar(CANNON_SCALE);
+  g.userData = { pivot: inner, arm, armBase: arm ? arm.rotation.x : 0, recoil: 0 };
+  return g;
+}
+
+function buildPrimitiveCannon() {
   const g = new THREE.Group();
   const wood = new THREE.MeshLambertMaterial({ color: 0x6b4420 });
   const iron = new THREE.MeshLambertMaterial({ color: 0x33373d });
@@ -536,7 +568,7 @@ function buildCannon() {
   pivot.rotation.x = 0.32;                  // tilt the muzzle up
   g.add(pivot);
   g.scale.setScalar(2.15);
-  g.userData = { pivot, recoil: 0 };
+  g.userData = { pivot, recoil: 0, primitive: true };
   return g;
 }
 
@@ -585,7 +617,9 @@ function updateCannon(dt) {
   if (cannonObj) {
     const u = cannonObj.userData;
     if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt);
-    if (u.pivot) u.pivot.position.z = 0.05 + (u.recoil / 0.16) * 0.22;   // kick back, ease home
+    const r = u.recoil / 0.16;                                  // 1 at fire -> 0 at rest
+    if (u.arm) u.arm.rotation.x = u.armBase - r * 1.0;          // catapult arm throws
+    else if (u.pivot) u.pivot.position.z = 0.05 + r * 0.22;     // primitive barrel recoil
   }
   for (let i = cannonProjectiles.length - 1; i >= 0; i--) {
     const p = cannonProjectiles[i];
