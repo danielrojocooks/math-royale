@@ -572,15 +572,18 @@ function buildPrimitiveCannon() {
   return g;
 }
 
-// a fat, fiery burst — the math payoff has to out-spectacle the battle
-function bigBoom(pos) {
+// a fat, fiery burst — the math payoff has to out-spectacle the battle.
+// fire=true uses the red/orange dragon-flame palette (matches the breath stream).
+function bigBoom(pos, fire) {
   // bright flash core that expands and fades fast
-  const flash = softSprite(0xffe7b0); flash.scale.setScalar(1.4);
+  const flash = softSprite(fire ? 0xffa840 : 0xffe7b0); flash.scale.setScalar(1.4);
   flash.position.copy(pos); flash.position.y += 0.85; scene.add(flash);
   localParts.push({ sp: flash, vx: 0, vy: 0, vz: 0, life: 0.26, maxlife: 0.26, grow: 8, own: true });
   // soft fiery puffs flung outward
   for (let i = 0; i < 40; i++) {
-    const sp = softSprite(i % 4 ? (i % 2 ? 0xff8a1e : 0xffcf4d) : 0xffffff);
+    const col = fire ? FIRE_COLORS[(Math.random() * FIRE_COLORS.length) | 0]
+                     : (i % 4 ? (i % 2 ? 0xff8a1e : 0xffcf4d) : 0xffffff);
+    const sp = softSprite(col);
     sp.scale.setScalar(0.42 + Math.random() * 0.6);
     sp.position.copy(pos); sp.position.y += 0.8;
     scene.add(sp);
@@ -694,7 +697,9 @@ export function fireDragon(tx, tz, onImpact) {
   // at mid-pass. Heading is derived from the actual travel vector so the nose
   // (and the fire out the mouth) always lead.
   const dir = Math.random() < 0.5 ? 1 : -1;
-  const fromX = dir * 12, toX = -dir * 12;
+  // sweep is CENTERED on the target so mid-pass the dragon is right over it and the
+  // fire lands on the target (instead of streaming into empty field beside it)
+  const fromX = target.x + dir * 12, toX = target.x - dir * 12;
   const fromZ = target.z + dir * DRAGON_ZSPAN + DRAGON_SOUTH, toZ = target.z - dir * DRAGON_ZSPAN + DRAGON_SOUTH;
   const yaw = Math.atan2(toX - fromX, toZ - fromZ) + DRAGON_YAW;
   const { g: obj, mixer } = makeDragon();
@@ -725,7 +730,7 @@ function updateDragons(dt) {
     }
     if (!d.fired && f >= 0.5) {        // the kill + impact boom land once, mid-stream
       d.fired = true;
-      bigBoom(new THREE.Vector3(d.target.x, 0.6, d.target.z));
+      bigBoom(new THREE.Vector3(d.target.x, 0.6, d.target.z), true);   // red flame palette
       if (d.onImpact) d.onImpact();
     }
   }
