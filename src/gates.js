@@ -49,10 +49,11 @@ function injectStyles() {
   s.id = 'gates-style';
   s.textContent = `
 #gate-card {
-  /* comic starburst: red border layer (.gate-burst) behind a yellow face (.gate-inner) */
-  --burst: polygon(50% 0%, 63.8% 16.7%, 85.4% 14.6%, 83.3% 36.2%, 100% 50%, 83.3% 63.8%,
-    85.4% 85.4%, 63.8% 83.3%, 50% 100%, 36.2% 83.3%, 14.6% 85.4%, 16.7% 63.8%,
-    0% 50%, 16.7% 36.2%, 14.6% 14.6%, 36.2% 16.7%);
+  /* comic explosion: irregular spiky burst, layered red/orange -> white -> yellow */
+  --burst: polygon(50% 0%, 59.3% 15.2%, 72% 11.9%, 73.3% 26.7%, 92.4% 25.5%, 84.8% 40.7%,
+    94% 50%, 81.9% 58.5%, 93.3% 75%, 75.5% 75.5%, 72% 88.1%, 58.5% 81.9%,
+    50% 99%, 40.7% 84.8%, 28% 88.1%, 26.7% 73.3%, 6.7% 75%, 15.2% 59.3%,
+    6% 50%, 18.1% 41.5%, 7.6% 25.5%, 24.5% 24.5%, 28% 11.9%, 41.5% 18.1%);
   position: fixed; z-index: 60;
   left: 50%; top: 33%;
   transform: translateX(-50%);
@@ -64,11 +65,14 @@ function injectStyles() {
   animation: gate-pop-in .32s cubic-bezier(.2,1.7,.5,1),
              gate-throb 1.0s ease-in-out .4s infinite;   /* urgent throb */
 }
-#gate-card .gate-burst { clip-path: var(--burst); background: #e11d2b; padding: 9px; }
+#gate-card .gate-burst { clip-path: var(--burst);
+  background: linear-gradient(160deg, #ff8a1e, #e11d2b);   /* orange->red spikes */
+  padding: 8px; }
+#gate-card .gate-mid { clip-path: var(--burst); background: #ffffff; padding: 6px; }  /* white ring */
 #gate-card .gate-inner {
   clip-path: var(--burst);
-  background: linear-gradient(180deg, #ffe690, #ffc238);
-  padding: clamp(30px, 7vw, 46px) clamp(34px, 8vw, 54px);
+  background: radial-gradient(circle at 50% 42%, #fff39a, #ffd23e);   /* yellow core */
+  padding: clamp(32px, 7.5vw, 50px) clamp(36px, 8.5vw, 58px);
   min-width: 150px; text-align: center;
 }
 @keyframes gate-throb {
@@ -198,21 +202,21 @@ function openCard(reward) {
   cardEl.id = 'gate-card';
   const rewardLabel = getWeapon() === 'dragon' ? '🐉 CALL THE DRAGON!' : '💥 FIRE THE CANNON!';
   if (mode === 'count') {
-    cardEl.innerHTML = `<div class="gate-burst"><div class="gate-inner">
+    cardEl.innerHTML = `<div class="gate-burst"><div class="gate-mid"><div class="gate-inner">
       <div class="reward">${rewardLabel}</div>
       <div class="eq">${f.a} + ${f.b} = ?</div>
       <div class="count">tap!</div>
       <div class="pips"></div>
       <div class="hint"></div>
-    </div></div>`;
+    </div></div></div>`;
     cardEl.addEventListener('pointerdown', onTap);
   } else {
-    cardEl.innerHTML = `<div class="gate-burst"><div class="gate-inner">
+    cardEl.innerHTML = `<div class="gate-burst"><div class="gate-mid"><div class="gate-inner">
       <div class="reward">${rewardLabel}</div>
       <div class="eq">${f.a} + ${f.b} = ?</div>
       <div class="ans"></div>
       <div class="hint"></div>
-    </div></div>`;
+    </div></div></div>`;
     const grid = cardEl.querySelector('.ans');
     for (const choice of makeChoices(f.sum)) {
       const b = document.createElement('button');

@@ -211,9 +211,8 @@ function towerFire(dt) {
       if (d < bd) { bd = d; best = t; }
     }
     if (!best) { tw.atkcd = 0.3; continue; }            // scan faster when nothing in range
-    const levelScale = 1 + (_cfg.level - 1) * 0.1;      // a bit faster each arena
-    const matchRamp = 1 + Math.min(0.4, S.T / 180);     // gentle within-match speed-up
-    tw.atkcd = 1.3 / (levelScale * matchRamp);          // slow enough that a wave can break through
+    const levelScale = 1 + (_cfg.level - 1) * 0.12;     // a bit faster each arena
+    tw.atkcd = 4.0 / levelScale;                        // ~4s between shots on Arena 1 (1 HP each)
     S.arrows.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y });   // render draws the flying arrow
     best.val -= 1; best.flash = .2; best.hit = .2;
     popup(best.x, best.y - 30, '-1', tw.side === 'you' ? '#bff' : '#fbb');
@@ -282,21 +281,22 @@ export function cannonPickTarget() {
   return null;
 }
 
-// AREA wipe radius (battle px) for the cannon/dragon strike.
-const BLAST_R = 130;
-
 /** cannonResolve — apply the hit (called by render3d at projectile impact, so the
- *  boom lands with the strike). AREA EFFECT: wipes every enemy within BLAST_R of
- *  the target, or chips the enemy king when the lane is clear. */
+ *  boom lands with the strike). Single target on early arenas; the blast radius
+ *  grows with the arena (AOE later). Chips the enemy king when the lane is clear. */
 export function cannonResolve(target) {
   if (!target) return;
   if (target.troop) {
-    const cx = target.x, cy = target.y;                // blast center (where it was aimed)
-    for (const t of S.troops) {
-      if (t.dead || t.side !== 'foe') continue;        // wipe enemies in the blast
-      if (Math.hypot(t.x - cx, t.y - cy) <= BLAST_R) kill(t);
+    const R = _cfg.level <= 2 ? 0 : 45 + (_cfg.level - 2) * 32;   // single early -> AOE later
+    if (R <= 0) {
+      if (!target.troop.dead) kill(target.troop);
+    } else {
+      for (const t of S.troops) {
+        if (t.dead || t.side !== 'foe') continue;
+        if (Math.hypot(t.x - target.x, t.y - target.y) <= R) kill(t);
+      }
     }
-    S.shake = Math.max(S.shake, .42);
+    S.shake = Math.max(S.shake, .4);
   } else if (target.tower && !target.tower.dead) {
     target.tower.hp -= 4; target.tower.flash = .3;     // solve chips the enemy king when the lane is clear
     if (target.tower.hp <= 0) { target.tower.dead = true; towerFx(target.tower); }
@@ -322,18 +322,21 @@ export function update(dt) {
     const liveLanes = [0, 1].filter(l =>
       S.towers.some(t => t.side === 'foe' && t.kind === 'prin' && t.lane === l && !t.dead));
     const kingAlive = S.towers.some(t => t.side === 'foe' && t.kind === 'king' && !t.dead);
-    const aff = FOES.filter(f => f.val <= S.foeElixir && f.val <= _cfg.foeMaxVal);
-    if (aff.length && (liveLanes.length || kingAlive)) {
-      const f = aff[Math.floor(Math.random() * aff.length)];
+    const lvl = Math.min(6, _cfg.level);
+    // Bigger enemies that scale with arena: ~3-5 HP on Arena 1, up to 6-8 late.
+    const vmin = Math.min(6, 2 + lvl), vmax = Math.min(8, 4 + lvl);
+    const band = FOES.filter(f => f.val >= vmin && f.val <= vmax && f.val <= S.foeElixir);
+    const pool = band.length ? band : FOES.filter(f => f.val <= S.foeElixir);   // afford a smaller one if broke
+    if (pool.length && (liveLanes.length || kingAlive)) {
+      const f = pool[Math.floor(Math.random() * pool.length)];
       S.foeElixir -= f.val;
       const lane = liveLanes.length ? liveLanes[Math.floor(Math.random() * liveLanes.length)]
                                     : Math.floor(Math.random() * 2);
       mkTroop('foe', lane, 190, f.val, f.spr);
-      // Steady but not a flood: a few seconds between spawns, a bit slower on early
-      // arenas (ramps to normal later). King-only production is slower still.
-      const lvl = Math.min(6, _cfg.level);
-      const gap = (liveLanes.length ? 2.0 : 3.6) * (1 + (6 - lvl) * 0.12);
-      S.foeTimer = gap + Math.random() * 1.5;
+      // Steady trickle (not a flood): a couple seconds between spawns, slightly
+      // slower on early arenas. King-only production is slower still.
+      const gap = (liveLanes.length ? 1.5 : 2.7) * (1 + (6 - lvl) * 0.12);
+      S.foeTimer = gap + Math.random() * 1.2;
     } else S.foeTimer = .6;
   }
 
