@@ -155,6 +155,40 @@ export function addElixir(n) {
   S.elixir = Math.min(10, S.elixir + n);
 }
 
+// ---- tower cannon (fired by gates.js on a correct answer) ----
+// A catapult on your king tower fires whenever the kid solves a math card, so
+// the reward for the math is itself an on-field explosion (playtest: an abstract
+// +power reward lost to the battle; a kablooie does not).
+
+/** cannonPickTarget — the thing the cannon should hit: the foe troop closest to
+ *  your king (largest y = deepest into your half), else the enemy king tower so
+ *  a correct answer is never wasted. Returns { x, y, troop?, tower? } or null. */
+export function cannonPickTarget() {
+  let best = null;
+  for (const t of S.troops) {
+    if (t.dead || t.side !== 'foe') continue;
+    if (!best || t.y > best.y) best = t;
+  }
+  if (best) return { x: best.x, y: best.y, troop: best };
+  const ek = S.towers.find(t => t.side === 'foe' && t.kind === 'king' && !t.dead);
+  if (ek) return { x: ek.x, y: ek.y, tower: ek };
+  return null;
+}
+
+/** cannonResolve — apply the hit (called by render3d at projectile impact, so the
+ *  boom lands with the cannonball). Kills the troop, or chips the enemy king. */
+export function cannonResolve(target) {
+  if (!target) return;
+  if (target.troop && !target.troop.dead) {
+    kill(target.troop);
+    S.shake = Math.max(S.shake, .32);
+  } else if (target.tower && !target.tower.dead) {
+    target.tower.hp -= 2; target.tower.flash = .3;
+    if (target.tower.hp <= 0) { target.tower.dead = true; towerFx(target.tower); }
+    S.shake = Math.max(S.shake, .32);
+  }
+}
+
 // ---- simulation ----
 export function update(dt) {
   S.T += dt;

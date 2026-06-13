@@ -1,11 +1,16 @@
-// src/gates.js — Repair gate (Epic E3, reworked after playtest feedback).
+// src/gates.js — Cannon gate (Epic E3; reward reworked after the 6/12 playtest).
 //
-// THE GATE: when a friendly tower is damaged, a card floats over the action
-// near it showing a direct addition fact: "3 + 3 = ?". The kid answers by
-// TAPPING THE CARD THAT MANY TIMES (counting with his finger). A short idle
-// beat after the last tap submits. Exact count -> tower heals by the answer.
-// Overshooting past the answer is an instant gentle miss (so tap-spam can't
-// brute-force it — only counting works). Battle DOES NOT pause.
+// THE GATE: a card floats over the action showing a direct addition fact:
+// "3 + 3 = ?". The kid answers by TAPPING THE CARD THAT MANY TIMES (counting
+// with his finger). A short idle beat after the last tap submits. Overshooting
+// past the answer is an instant gentle miss (so tap-spam can't brute-force it
+// — only counting works). Battle DOES NOT pause.
+//
+// REWARD: solving fires your king's catapult, which kills the enemy nearest your
+// tower (a big on-field explosion). Playtest finding: an abstract +power/heal
+// reward lost to the battle; an explosion the kid CAUSED does not. The cannon
+// shot is the SOLE reward (the old +3 power deploy bonus also made the game too
+// easy, so it was dropped).
 //
 // FACT-ID SCHEME: "A+B" (e.g. "3+4"), direct addition within 10.
 // TODO (E4): replace FACT_POOL with arena pools from arenas.js.
@@ -13,8 +18,8 @@
 // The old charge gate was cut (design feedback: interruptive, didn't fit).
 // Build-exact-N lives on in catapult-puzzle.html -> Training Grounds (E8).
 
-import { S, repairTower, addElixir } from './battle.js';
-import { worldToScreen } from './render3d.js';
+import { S, cannonPickTarget, cannonResolve } from './battle.js';
+import { worldToScreen, fireCannon } from './render3d.js';
 import { pickGateFact, scaffoldTier, recordAttempt } from './mastery.js';
 import { loadProfile, saveProfile, getActiveProfileId } from './store.js';
 
@@ -31,8 +36,7 @@ export function setFactPools(pool, earlier) {
 }
 
 const IDLE_SUBMIT_MS = 1000;   // pause after last tap = submit
-const COOLDOWN_MS = 8000;      // per-board cooldown between repair cards
-const HEAL_IS_SUM = true;      // heal amount = the answer (bigger fact, bigger heal)
+const COOLDOWN_MS = 8000;      // per-board cooldown between math cards
 
 let cardEl = null;             // the single floating card (one at a time)
 let cardState = null;          // { tower, factId, a, b, sum, count, firstTapAt, idleTimer, tier, missed }
@@ -169,7 +173,7 @@ function makeChoices(sum) {
 }
 
 // ─── card lifecycle ──────────────────────────────────────────────────────────
-// reward: { type: 'repair', tower } | { type: 'elixir', tower } (tower = anchor)
+// reward: { tower } — tower is the anchor (your king); solving fires its cannon
 function openCard(reward) {
   const profile = getProfile();
   if (!profile) return;
@@ -188,7 +192,7 @@ function openCard(reward) {
 
   cardEl = document.createElement('div');
   cardEl.id = 'gate-card';
-  const rewardLabel = reward.type === 'repair' ? '🔧 fix the tower!' : '⚡ win power!';
+  const rewardLabel = '💥 FIRE THE CANNON!';
   if (mode === 'count') {
     cardEl.innerHTML = `
       <div class="reward">${rewardLabel}</div>
@@ -269,8 +273,11 @@ function resolve(correct) {
   saveProfile(cs.profile);
 
   if (correct) {
-    if (cs.reward.type === 'repair') repairTower(cs.reward.tower, HEAL_IS_SUM ? cs.sum : 1);
-    else addElixir(3);
+    // the reward IS the cannon shot: pick a target, fire, kill on impact.
+    // (No +power/heal — the on-field boom is the whole payoff. Playtest: an
+    // abstract reward lost to the battle; an explosion the kid caused does not.)
+    const target = cannonPickTarget();
+    if (target) fireCannon(target.x, target.y, () => cannonResolve(target));
     const r = cardEl.getBoundingClientRect();
     confettiAt(r.left + r.width / 2, r.top + r.height / 2);
     cardEl.classList.add('solved');
@@ -324,18 +331,9 @@ export function updateGates() {
     return;
   }
 
-  // no card: maybe spawn one, off cooldown.
-  // Damaged tower -> repair card there. All healthy -> elixir card at your king.
+  // no card: spawn one whenever off cooldown — the math should always be on offer.
+  // Solving it fires the king's cannon (the sole reward). Anchored to your king.
   if (Date.now() < cooldownUntil) return;
-  let worst = null;
-  for (const t of S.towers) {
-    if (t.side !== 'you' || t.dead || t.hp >= t.maxhp) continue;
-    if (!worst || (t.maxhp - t.hp) > (worst.maxhp - worst.hp)) worst = t;
-  }
-  if (worst) { openCard({ type: 'repair', tower: worst }); return; }
-  // power card is (nearly) always available — the math should never be absent
-  if (S.elixir < 10) {
-    const king = S.towers.find(t => t.side === 'you' && t.kind === 'king' && !t.dead);
-    if (king) openCard({ type: 'elixir', tower: king });
-  }
+  const king = S.towers.find(t => t.side === 'you' && t.kind === 'king' && !t.dead);
+  if (king) openCard({ tower: king });
 }

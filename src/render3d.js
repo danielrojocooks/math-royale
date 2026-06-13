@@ -71,6 +71,7 @@ function rebuildTheme() {
 }
 let towersBuilt = false, towerVis = new Map(), troopVis = new Map();
 let partVis = new Map(), matCache = {};
+let cannonObj = null, cannonProjectiles = [];   // catapult on your king + in-flight shots
 
 export function initRender(canvas) {
   ren = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -305,6 +306,7 @@ function syncTowers(S) {
   if (stale) {
     for (const [, v] of towerVis) { scene.remove(v.obj); if (v.hpBadge) scene.remove(v.hpBadge); }
     towerVis.clear();
+    if (cannonObj) { scene.remove(cannonObj); cannonObj = null; }
     for (const t of S.towers) {
       const model = t.kind === 'king' ? assets.env.castle : assets.env.watchtower;
       const s = t.kind === 'king' ? 1.5 : 1.15;
@@ -315,6 +317,12 @@ function syncTowers(S) {
       hpBadge.position.set(bx(t.x), t.kind === 'king' ? 3.6 : 2.9, bz(t.y));
       scene.add(hpBadge);
       towerVis.set(t, { obj, hpBadge, hpShown: Math.ceil(t.hp), dead: false });
+      // mount the catapult on YOUR king tower (fires on a solved math card)
+      if (t.side === 'you' && t.kind === 'king') {
+        cannonObj = buildCannon();
+        cannonObj.position.set(bx(t.x), 2.15, bz(t.y) + 0.1);
+        scene.add(cannonObj);
+      }
     }
   }
   for (const [t, v] of towerVis) {
@@ -465,12 +473,98 @@ function syncParts(S, dt) {
   }
 }
 
+// ---- tower cannon: a catapult on your king that fires on a solved math card ----
+function buildCannon() {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ color: 0x6b4420 });
+  const iron = new THREE.MeshLambertMaterial({ color: 0x33373d });
+  // carriage
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.2, 0.5), wood);
+  base.castShadow = true; g.add(base);
+  // wheels
+  for (const sx of [-0.34, 0.34]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 16), iron);
+    w.rotation.z = Math.PI / 2; w.position.set(sx, -0.05, 0.05); g.add(w);
+  }
+  // barrel pivot (recoils/aims downrange = -Z, toward the enemy castle)
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 0.16, 0.05);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.78, 20), iron);
+  barrel.rotation.x = -Math.PI / 2;        // length now along -Z
+  barrel.position.z = -0.24; barrel.castShadow = true;
+  pivot.add(barrel);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.04, 8, 18), wood);
+  rim.position.z = -0.62; pivot.add(rim);
+  pivot.rotation.x = 0.32;                  // tilt the muzzle up
+  g.add(pivot);
+  g.scale.setScalar(1.5);
+  g.userData = { pivot, recoil: 0 };
+  return g;
+}
+
+// a fat, fiery burst — the math payoff has to out-spectacle the battle
+function bigBoom(pos) {
+  for (let i = 0; i < 40; i++) {
+    const sp = new THREE.Sprite(mat(i % 4 ? (i % 2 ? 0xff8a1e : 0xffcf4d) : 0xffffff));
+    sp.scale.setScalar(0.35 + Math.random() * 0.55);
+    sp.position.copy(pos); sp.position.y += 0.8;
+    scene.add(sp);
+    const a = Math.random() * 6.28, s = 4 + Math.random() * 7;
+    localParts.push({ sp, vx: Math.cos(a) * s, vy: 3.5 + Math.random() * 5.5, vz: Math.sin(a) * s, life: 0.8 + Math.random() * 0.3 });
+  }
+}
+
+/** fireCannon — launch a shot from your king's catapult to a battlefield point
+ *  (battle coords). onImpact runs when the ball lands, so the kill lands with the
+ *  boom. Called by gates.js on a correct answer. */
+export function fireCannon(tx, tz, onImpact) {
+  if (!ready || !cannonObj) { if (onImpact) onImpact(); return; }
+  cannonObj.userData.recoil = 0.16;
+  const muzzle = new THREE.Vector3();
+  cannonObj.getWorldPosition(muzzle); muzzle.y += 0.4; muzzle.z -= 0.4;
+  const to = new THREE.Vector3(bx(tx), 0.6, bz(tz));
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 14),
+    new THREE.MeshLambertMaterial({ color: 0x222428 }));
+  ball.position.copy(muzzle); ball.castShadow = true; scene.add(ball);
+  cannonProjectiles.push({ ball, from: muzzle.clone(), to, t: 0, dur: 0.4, onImpact });
+  // muzzle flash
+  for (let i = 0; i < 8; i++) {
+    const sp = new THREE.Sprite(mat(i % 2 ? 0xffcf4d : 0xffffff));
+    sp.scale.setScalar(0.3 + Math.random() * 0.25);
+    sp.position.copy(muzzle); scene.add(sp);
+    const a = Math.random() * 6.28, s = 1.5 + Math.random() * 2;
+    localParts.push({ sp, vx: Math.cos(a) * s, vy: 1 + Math.random() * 2, vz: Math.sin(a) * s, life: 0.3 });
+  }
+}
+
+function updateCannon(dt) {
+  if (cannonObj) {
+    const u = cannonObj.userData;
+    if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt);
+    if (u.pivot) u.pivot.position.z = 0.05 + (u.recoil / 0.16) * 0.22;   // kick back, ease home
+  }
+  for (let i = cannonProjectiles.length - 1; i >= 0; i--) {
+    const p = cannonProjectiles[i];
+    p.t += dt;
+    const f = Math.min(1, p.t / p.dur);
+    p.ball.position.lerpVectors(p.from, p.to, f);
+    p.ball.position.y += 3.2 * f * (1 - f);            // parabolic arc
+    if (f >= 1) {
+      scene.remove(p.ball);
+      bigBoom(p.to);
+      if (p.onImpact) p.onImpact();
+      cannonProjectiles.splice(i, 1);
+    }
+  }
+}
+
 // ---- public API (matches render2d.js) ----
 export function render(S) {
   const dt = Math.min(0.05, clock.getDelta());
   syncTowers(S);
   syncTroops(S, dt);
   syncParts(S, dt);
+  updateCannon(dt);
   // camera shake
   if (S.shake > 0) {
     cam.position.x += (Math.random() - .5) * S.shake * 0.5;
