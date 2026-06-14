@@ -38,9 +38,16 @@
 </script>
 <script type="importmap">
 {"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three":"./vendor/three.module.js",
+  "three/addons/":"./vendor/addons/"
 }}
+</script>
+<script>
+// Service worker: cache everything so the game runs with no wifi. Network-first
+// for code (always fresh online), cache-first for the big stable 3D assets.
+if ('serviceWorker' in navigator) {
+  addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
 </script>
 <script type="module" src="src/main.js"></script>
 </body>
