@@ -34,8 +34,9 @@ The first build rewarded a correct answer with abstract resource ("power"). The 
 
 ## Tech
 
-- **Vanilla JavaScript, ES modules, zero build step, zero npm dependencies.** Open `index.html` and it runs.
-- **three.js** (via CDN import map) for the 3D battlefield; **localStorage** for all save data (no backend, no network calls at runtime, nothing leaves the device).
+- **Vanilla JavaScript, ES modules, zero build step, zero npm dependencies.** No toolchain — serve the folder and it runs.
+- **three.js** for the 3D battlefield, vendored locally (no CDN); **localStorage** for all save data. No backend, no network calls at runtime, nothing leaves the device.
+- **Installable, fully-offline PWA.** A service worker precaches the engine and every asset, so after the first load it runs with the network completely off — "Add to Home Screen" on a tablet and it behaves like a native app.
 - **CC0 art** from [KayKit](https://kaylousberg.itch.io/) and [Kenney](https://kenney.nl) — skeletally-animated characters, weapons socketed into the rig's hands, modular environments themed per arena.
 - ~4,000 lines across a deliberately layered architecture.
 
@@ -63,7 +64,6 @@ then open `http://localhost:8765/index.html`. (A static server is needed so ES m
 
 ## What's next / known limits
 
-- One service-worker pass away from full offline PWA (the only runtime network dependency is the three.js CDN).
 - A reading track (Dolch sight-word spell cards) is designed but not built.
 - Multi-lane arenas and arenas 7–10 (subtraction, multiplication, division gates) are scoped but not implemented.
 
